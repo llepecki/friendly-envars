@@ -35,7 +35,7 @@ public class OptionsResolutionTests : IDisposable
     {
         Environment.SetEnvironmentVariable("TEST_SETTING", null);
         Environment.SetEnvironmentVariable("OPTIONAL_SETTING", null);
-        _serviceProvider?.Dispose();
+        _serviceProvider.Dispose();
     }
 
     [Fact]

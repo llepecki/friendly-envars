@@ -9,7 +9,11 @@ public class EnvarAttribute : Attribute
 
     public EnvarAttribute(string name)
     {
-        ArgumentException.ThrowIfNullOrEmpty(name);
+        if (string.IsNullOrEmpty(name))
+        {
+            throw new ArgumentException("Name can't be null or empty", nameof(name));       
+        }
+
         Name = name;
     }
 }

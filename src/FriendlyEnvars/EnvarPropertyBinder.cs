@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel;
-using System.Reflection;
 
 namespace FriendlyEnvars;
 
@@ -29,7 +28,7 @@ public class EnvarPropertyBinder : IEnvarPropertyBinder
         {
             TypeCode.Boolean => bool.Parse(value),
             TypeCode.Byte => byte.Parse(value),
-            TypeCode.Char => value.Length == 1 ? value[0] : throw new EnvarsException($"Cannot convert '{value}' to char - must be exactly one character"),
+            TypeCode.Char => value.Length == 1 ? value[0] : throw new EnvarsException($"Can't convert '{value}' to char - must be exactly one character"),
             TypeCode.Int16 => short.Parse(value),
             TypeCode.Int32 => int.Parse(value),
             TypeCode.Int64 => long.Parse(value),
@@ -59,6 +58,6 @@ public class EnvarPropertyBinder : IEnvarPropertyBinder
             return converter.ConvertFromString(value);
         }
 
-        throw new EnvarsException($"Cannot convert string to type '{targetType.Name}'");
+        throw new EnvarsException($"Can't convert string to type '{targetType.Name}'");
     }
 }
