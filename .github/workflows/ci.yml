@@ -23,7 +23,7 @@ jobs:
           dotnet-version: ${{ matrix.dotnet-version }}
 
       - name: Restore
-        run: dotnet restore
+        run: dotnet restore FriendlyEnvars.slnx
 
       - name: Build
         run: dotnet build --no-restore --configuration Release
