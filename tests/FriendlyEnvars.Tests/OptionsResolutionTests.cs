@@ -6,7 +6,7 @@ using Xunit;
 
 namespace FriendlyEnvars.Tests;
 
-public class OptionsResolutionTests : IDisposable
+public class OptionsResolutionTests : EnvarTestsBase
 {
     private readonly ServiceProvider _serviceProvider;
 
@@ -22,8 +22,8 @@ public class OptionsResolutionTests : IDisposable
 
     public OptionsResolutionTests()
     {
-        Environment.SetEnvironmentVariable("TEST_SETTING", "test_value");
-        Environment.SetEnvironmentVariable("OPTIONAL_SETTING", "optional_value");
+        SetEnvironmentVariable("TEST_SETTING", "test_value");
+        SetEnvironmentVariable("OPTIONAL_SETTING", "optional_value");
 
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>().BindFromEnvarAttributes();
@@ -31,10 +31,9 @@ public class OptionsResolutionTests : IDisposable
         _serviceProvider = services.BuildServiceProvider();
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
-        Environment.SetEnvironmentVariable("TEST_SETTING", null);
-        Environment.SetEnvironmentVariable("OPTIONAL_SETTING", null);
+        base.Dispose();
         _serviceProvider.Dispose();
     }
 

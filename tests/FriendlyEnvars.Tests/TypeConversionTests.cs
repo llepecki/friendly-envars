@@ -1,28 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System;
-using System.Collections.Generic;
 using Xunit;
 
 namespace FriendlyEnvars.Tests;
 
-public class TypeConversionTests : IDisposable
+public class TypeConversionTests : EnvarTestsBase
 {
-    private readonly List<string> _environmentVariablesToCleanup = [];
-
-    public void Dispose()
-    {
-        foreach (var envVar in _environmentVariablesToCleanup)
-        {
-            Environment.SetEnvironmentVariable(envVar, null);
-        }
-    }
-
-    private void SetEnvironmentVariable(string name, string? value)
-    {
-        Environment.SetEnvironmentVariable(name, value);
-        _environmentVariablesToCleanup.Add(name);
-    }
 
     public class TypeOptions
     {
