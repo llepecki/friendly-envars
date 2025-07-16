@@ -11,7 +11,7 @@ public class EnvarAttribute : Attribute
     {
         if (string.IsNullOrEmpty(name))
         {
-            throw new ArgumentException("Name can't be null or empty", nameof(name));       
+            throw new ArgumentException("Name can't be null or empty", nameof(name));
         }
 
         Name = name;

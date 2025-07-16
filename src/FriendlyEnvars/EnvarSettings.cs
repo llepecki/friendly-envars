@@ -1,10 +1,13 @@
+using System.Globalization;
+
 namespace FriendlyEnvars;
 
 public record EnvarSettings
 {
     internal EnvarSettings()
     {
-        EnvarPropertyBinder = new EnvarPropertyBinder();
+        EnvarPropertyBinder = new DefaultEnvarPropertyBinder();
+        Culture = CultureInfo.InvariantCulture;
         IsOptionsSnapshotAllowed = false;
         IsOptionsMonitorAllowed = false;
     }
@@ -12,6 +15,12 @@ public record EnvarSettings
     public EnvarSettings UseCustomEnvarPropertyBinder(IEnvarPropertyBinder binder)
     {
         EnvarPropertyBinder = binder;
+        return this;
+    }
+
+    public EnvarSettings UseCulture(CultureInfo culture)
+    {
+        Culture = culture;
         return this;
     }
 
@@ -28,6 +37,8 @@ public record EnvarSettings
     }
 
     internal IEnvarPropertyBinder EnvarPropertyBinder { get; private set; }
+
+    internal CultureInfo Culture { get; private set; }
 
     internal bool IsOptionsSnapshotAllowed { get; private set; }
 

@@ -60,19 +60,19 @@ public class EnvarValidationTests : IDisposable
         SetEnvironmentVariable("VALIDATION_EMAIL_SETTING", "test@example.com");
         SetEnvironmentVariable("VALIDATION_URL_SETTING", "https://example.com");
 
-        var options = OptionsBuilderExtensions.BindFromEnvironmentVariables<TestOptions>(new EnvarPropertyBinder());
-        var validationContext = new ValidationContext(options);
-        var validationResults = new List<ValidationResult>();
-        var isValid = Validator.TryValidateObject(options, validationContext, validationResults, true);
+        var services = new ServiceCollection();
+        services.AddOptions<TestOptions>()
+            .BindFromEnvarAttributes()
+            .ValidateDataAnnotations();
 
-        Assert.True(isValid);
-        Assert.Empty(validationResults);
+        var serviceProvider = services.BuildServiceProvider();
+        var options = serviceProvider.GetRequiredService<IOptions<TestOptions>>().Value;
+
         Assert.Equal("test", options.RequiredSetting);
         Assert.Equal("short", options.StringLengthSetting);
         Assert.Equal(50, options.RangeSetting);
         Assert.Equal("test@example.com", options.EmailSetting);
         Assert.Equal("https://example.com", options.UrlSetting);
-
     }
 
     [Fact]
@@ -82,14 +82,15 @@ public class EnvarValidationTests : IDisposable
         SetEnvironmentVariable("VALIDATION_RANGE_SETTING", "50");
         SetEnvironmentVariable("VALIDATION_EMAIL_SETTING", "test@example.com");
 
-        var options = OptionsBuilderExtensions.BindFromEnvironmentVariables<TestOptions>(new EnvarPropertyBinder());
-        var validationContext = new ValidationContext(options);
-        var validationResults = new List<ValidationResult>();
-        var isValid = Validator.TryValidateObject(options, validationContext, validationResults, true);
+        var services = new ServiceCollection();
+        services.AddOptions<TestOptions>()
+            .BindFromEnvarAttributes()
+            .ValidateDataAnnotations();
 
-        Assert.False(isValid);
-        Assert.Contains(validationResults, r => r.ErrorMessage!.Contains("RequiredSetting"));
+        var serviceProvider = services.BuildServiceProvider();
+        var exception = Assert.Throws<OptionsValidationException>(() => serviceProvider.GetRequiredService<IOptions<TestOptions>>().Value);
 
+        Assert.Contains("RequiredSetting", exception.Message);
     }
 
     [Fact]
@@ -100,14 +101,15 @@ public class EnvarValidationTests : IDisposable
         SetEnvironmentVariable("VALIDATION_RANGE_SETTING", "50");
         SetEnvironmentVariable("VALIDATION_EMAIL_SETTING", "test@example.com");
 
-        var options = OptionsBuilderExtensions.BindFromEnvironmentVariables<TestOptions>(new EnvarPropertyBinder());
-        var validationContext = new ValidationContext(options);
-        var validationResults = new List<ValidationResult>();
-        var isValid = Validator.TryValidateObject(options, validationContext, validationResults, true);
+        var services = new ServiceCollection();
+        services.AddOptions<TestOptions>()
+            .BindFromEnvarAttributes()
+            .ValidateDataAnnotations();
 
-        Assert.False(isValid);
-        Assert.Contains(validationResults, r => r.ErrorMessage!.Contains("StringLengthSetting"));
+        var serviceProvider = services.BuildServiceProvider();
+        var exception = Assert.Throws<OptionsValidationException>(() => serviceProvider.GetRequiredService<IOptions<TestOptions>>().Value);
 
+        Assert.Contains("StringLengthSetting", exception.Message);
     }
 
     [Fact]
@@ -118,14 +120,15 @@ public class EnvarValidationTests : IDisposable
         SetEnvironmentVariable("VALIDATION_RANGE_SETTING", "200");
         SetEnvironmentVariable("VALIDATION_EMAIL_SETTING", "test@example.com");
 
-        var options = OptionsBuilderExtensions.BindFromEnvironmentVariables<TestOptions>(new EnvarPropertyBinder());
-        var validationContext = new ValidationContext(options);
-        var validationResults = new List<ValidationResult>();
-        var isValid = Validator.TryValidateObject(options, validationContext, validationResults, true);
+        var services = new ServiceCollection();
+        services.AddOptions<TestOptions>()
+            .BindFromEnvarAttributes()
+            .ValidateDataAnnotations();
 
-        Assert.False(isValid);
-        Assert.Contains(validationResults, r => r.ErrorMessage!.Contains("RangeSetting"));
+        var serviceProvider = services.BuildServiceProvider();
+        var exception = Assert.Throws<OptionsValidationException>(() => serviceProvider.GetRequiredService<IOptions<TestOptions>>().Value);
 
+        Assert.Contains("RangeSetting", exception.Message);
     }
 
     [Fact]
@@ -136,14 +139,15 @@ public class EnvarValidationTests : IDisposable
         SetEnvironmentVariable("VALIDATION_RANGE_SETTING", "50");
         SetEnvironmentVariable("VALIDATION_EMAIL_SETTING", "invalid-email");
 
-        var options = OptionsBuilderExtensions.BindFromEnvironmentVariables<TestOptions>(new EnvarPropertyBinder());
-        var validationContext = new ValidationContext(options);
-        var validationResults = new List<ValidationResult>();
-        var isValid = Validator.TryValidateObject(options, validationContext, validationResults, true);
+        var services = new ServiceCollection();
+        services.AddOptions<TestOptions>()
+            .BindFromEnvarAttributes()
+            .ValidateDataAnnotations();
 
-        Assert.False(isValid);
-        Assert.Contains(validationResults, r => r.ErrorMessage!.Contains("EmailSetting"));
+        var serviceProvider = services.BuildServiceProvider();
+        var exception = Assert.Throws<OptionsValidationException>(() => serviceProvider.GetRequiredService<IOptions<TestOptions>>().Value);
 
+        Assert.Contains("EmailSetting", exception.Message);
     }
 
     [Fact]
@@ -157,16 +161,7 @@ public class EnvarValidationTests : IDisposable
 
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>()
-            .Configure(options =>
-            {
-                var boundOptions = OptionsBuilderExtensions.BindFromEnvironmentVariables<TestOptions>(new EnvarPropertyBinder());
-                options.RequiredSetting = boundOptions.RequiredSetting;
-                options.StringLengthSetting = boundOptions.StringLengthSetting;
-                options.RangeSetting = boundOptions.RangeSetting;
-                options.EmailSetting = boundOptions.EmailSetting;
-                options.UrlSetting = boundOptions.UrlSetting;
-                options.OptionalSetting = boundOptions.OptionalSetting;
-            })
+            .BindFromEnvarAttributes()
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
@@ -178,7 +173,6 @@ public class EnvarValidationTests : IDisposable
         Assert.Equal(50, options.Value.RangeSetting);
         Assert.Equal("test@example.com", options.Value.EmailSetting);
         Assert.Equal("https://example.com", options.Value.UrlSetting);
-
     }
 
     [Fact]
@@ -190,14 +184,15 @@ public class EnvarValidationTests : IDisposable
         SetEnvironmentVariable("VALIDATION_EMAIL_SETTING", "test@example.com");
         SetEnvironmentVariable("VALIDATION_URL_SETTING", "not-a-valid-url");
 
-        var options = OptionsBuilderExtensions.BindFromEnvironmentVariables<TestOptions>(new EnvarPropertyBinder());
-        var validationContext = new ValidationContext(options);
-        var validationResults = new List<ValidationResult>();
-        var isValid = Validator.TryValidateObject(options, validationContext, validationResults, true);
+        var services = new ServiceCollection();
+        services.AddOptions<TestOptions>()
+            .BindFromEnvarAttributes()
+            .ValidateDataAnnotations();
 
-        Assert.False(isValid);
-        Assert.Contains(validationResults, r => r.ErrorMessage!.Contains("UrlSetting"));
+        var serviceProvider = services.BuildServiceProvider();
+        var exception = Assert.Throws<OptionsValidationException>(() => serviceProvider.GetRequiredService<IOptions<TestOptions>>().Value);
 
+        Assert.Contains("UrlSetting", exception.Message);
     }
 
     [Fact]
@@ -209,16 +204,16 @@ public class EnvarValidationTests : IDisposable
         SetEnvironmentVariable("VALIDATION_EMAIL_SETTING", "test@example.com");
         SetEnvironmentVariable("VALIDATION_URL_SETTING", "http://example.com");
 
-        var options = OptionsBuilderExtensions.BindFromEnvironmentVariables<TestOptions>(new EnvarPropertyBinder());
-        var validationContext = new ValidationContext(options);
-        var validationResults = new List<ValidationResult>();
-        var isValid = Validator.TryValidateObject(options, validationContext, validationResults, true);
+        var services = new ServiceCollection();
+        services.AddOptions<TestOptions>()
+            .BindFromEnvarAttributes()
+            .ValidateDataAnnotations();
 
-        Assert.True(isValid);
-        Assert.Empty(validationResults);
+        var serviceProvider = services.BuildServiceProvider();
+        var options = serviceProvider.GetRequiredService<IOptions<TestOptions>>().Value;
+
         Assert.Equal("test", options.RequiredSetting);
         Assert.Equal("http://example.com", options.UrlSetting);
-
     }
 
     [Fact]
@@ -230,16 +225,16 @@ public class EnvarValidationTests : IDisposable
         SetEnvironmentVariable("VALIDATION_EMAIL_SETTING", "test@example.com");
         SetEnvironmentVariable("VALIDATION_URL_SETTING", "ftp://files.example.com");
 
-        var options = OptionsBuilderExtensions.BindFromEnvironmentVariables<TestOptions>(new EnvarPropertyBinder());
-        var validationContext = new ValidationContext(options);
-        var validationResults = new List<ValidationResult>();
-        var isValid = Validator.TryValidateObject(options, validationContext, validationResults, true);
+        var services = new ServiceCollection();
+        services.AddOptions<TestOptions>()
+            .BindFromEnvarAttributes()
+            .ValidateDataAnnotations();
 
-        Assert.True(isValid);
-        Assert.Empty(validationResults);
+        var serviceProvider = services.BuildServiceProvider();
+        var options = serviceProvider.GetRequiredService<IOptions<TestOptions>>().Value;
+
         Assert.Equal("test", options.RequiredSetting);
         Assert.Equal("ftp://files.example.com", options.UrlSetting);
-
     }
 
     [Fact]
@@ -251,23 +246,12 @@ public class EnvarValidationTests : IDisposable
 
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>()
-            .Configure(options =>
-            {
-                var boundOptions = OptionsBuilderExtensions.BindFromEnvironmentVariables<TestOptions>(new EnvarPropertyBinder());
-                options.RequiredSetting = boundOptions.RequiredSetting;
-                options.StringLengthSetting = boundOptions.StringLengthSetting;
-                options.RangeSetting = boundOptions.RangeSetting;
-                options.EmailSetting = boundOptions.EmailSetting;
-                options.UrlSetting = boundOptions.UrlSetting;
-                options.OptionalSetting = boundOptions.OptionalSetting;
-            })
+            .BindFromEnvarAttributes()
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
         var serviceProvider = services.BuildServiceProvider();
 
         Assert.Throws<OptionsValidationException>(() => serviceProvider.GetRequiredService<IOptions<TestOptions>>().Value);
-
     }
-
 }
