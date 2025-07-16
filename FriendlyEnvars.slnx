@@ -1,0 +1,14 @@
+<Solution>
+    <Folder Name="/root/">
+        <File Path=".editorconfig" />
+        <File Path=".gitignore" />
+        <File Path="README.md" />
+        <File Path="LICENSE" />
+    </Folder>
+    <Folder Name="/src/">
+        <Project Path="src/FriendlyEnvars/FriendlyEnvars.csproj" />
+    </Folder>
+    <Folder Name="/tests/">
+        <Project Path="tests\FriendlyEnvars.Tests\FriendlyEnvars.Tests.csproj" Type="Classic C#" />
+    </Folder>
+</Solution>
