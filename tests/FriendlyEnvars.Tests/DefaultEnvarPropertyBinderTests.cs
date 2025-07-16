@@ -393,16 +393,13 @@ public class DefaultEnvarPropertyBinderTests
 
     public class UnsupportedType
     {
-        public string Value { get; set; } = "";
+        public string Value { get; set; } = string.Empty;
     }
 
     [Fact]
     public void Convert_UnsupportedType_ThrowsEnvarsException()
     {
-        var exception = Assert.Throws<EnvarsException>(() => _binder.Convert("test", typeof(UnsupportedType), _invariantCulture));
-
-        Assert.Contains("Can't convert string to type", exception.Message);
-        Assert.Contains("UnsupportedType", exception.Message);
+        Assert.Throws<NotSupportedException>(() => _binder.Convert("test", typeof(UnsupportedType), _invariantCulture));
     }
 
     [Theory]

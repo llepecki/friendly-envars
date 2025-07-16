@@ -59,18 +59,6 @@ public class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
     private static object? ConvertUsingTypeConverter(string value, Type targetType)
     {
         var converter = TypeDescriptor.GetConverter(targetType);
-        if (!converter.CanConvertFrom(typeof(string)))
-        {
-            throw new EnvarsException($"Can't convert string to type {targetType.Name}");
-        }
-
-        try
-        {
-            return converter.ConvertFromString(value);
-        }
-        catch (NotSupportedException ex)
-        {
-            throw new EnvarsException($"Can't convert string to type {targetType.Name}", ex);
-        }
+        return converter.ConvertFromString(value);
     }
 }
