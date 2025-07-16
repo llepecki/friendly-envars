@@ -9,10 +9,16 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    name: Build and Test
 
     strategy:
       matrix:
         dotnet-version: [ '8.0.x', '9.0.x' ]
+        include:
+          - dotnet-version: '8.0.x'
+            framework: 'net8.0'
+          - dotnet-version: '9.0.x'
+            framework: 'net9.0'
 
     steps:
       - uses: actions/checkout@v4
@@ -30,8 +36,8 @@ jobs:
       - name: Restore
         run: dotnet restore FriendlyEnvars.slnx
 
-      - name: Build
-        run: dotnet build --no-restore --configuration Release --framework net${{ matrix.dotnet-version == '8.0.x' && '8.0' || '9.0' }} FriendlyEnvars.slnx
+      - name: Build ${{ matrix.framework }}
+        run: dotnet build --no-restore --configuration Release --framework ${{ matrix.framework }} FriendlyEnvars.slnx
 
-      - name: Test
-        run: dotnet test --no-build --configuration Release --framework net${{ matrix.dotnet-version == '8.0.x' && '8.0' || '9.0' }} --verbosity normal FriendlyEnvars.slnx
+      - name: Test ${{ matrix.framework }}
+        run: dotnet test --no-build --configuration Release --framework ${{ matrix.framework }} --verbosity normal FriendlyEnvars.slnx
