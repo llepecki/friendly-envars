@@ -15,7 +15,7 @@ jobs:
       actions: read
       checks: write
     env:
-      VersionSuffix: beta-${{ github.run_number }}
+      VersionSuffix: ${{ github.ref == 'refs/heads/master' && 'beta' || format('beta-{0}', github.run_number) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -31,13 +31,13 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore
-        run: dotnet restore FriendlyEnvars.slnx
+        run: dotnet restore --maxcpucount:1 FriendlyEnvars.slnx
 
       - name: Build
         run: dotnet build --no-restore --configuration Release --framework net8.0 --maxcpucount:1 FriendlyEnvars.slnx
 
       - name: Test
-        run: dotnet test --no-build --configuration Release --framework net8.0 --verbosity normal --logger trx --results-directory TestResults FriendlyEnvars.slnx
+        run: dotnet test --no-restore --no-build --configuration Release --framework net8.0 --maxcpucount:1 --verbosity normal --logger trx --results-directory TestResults FriendlyEnvars.slnx
 
       - name: Publish Test Results
         uses: dorny/test-reporter@v1
@@ -58,7 +58,10 @@ jobs:
 
       - name: Publish Package Download Link
         run: |
-          echo "## 📦 NuGet Package Generated" >> $GITHUB_STEP_SUMMARY
-          echo "The NuGet package has been built and is available for download:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Package**: FriendlyEnvars.1.0.0-beta-${{ github.run_number }}.nupkg" >> $GITHUB_STEP_SUMMARY
+          echo "📦 NuGet Package Generated" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.ref }}" == "refs/heads/master" ]; then
+            echo "- **Package**: FriendlyEnvars.1.0.0-beta.nupkg" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Package**: FriendlyEnvars.1.0.0-beta-${{ github.run_number }}.nupkg" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "- **Download**: Available in the [Artifacts section](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) of this workflow run" >> $GITHUB_STEP_SUMMARY
