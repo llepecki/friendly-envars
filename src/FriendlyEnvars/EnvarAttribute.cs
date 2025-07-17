@@ -3,7 +3,7 @@ using System;
 namespace FriendlyEnvars;
 
 [AttributeUsage(AttributeTargets.Property)]
-public class EnvarAttribute : Attribute
+public sealed class EnvarAttribute : Attribute
 {
     public string Name { get; }
 

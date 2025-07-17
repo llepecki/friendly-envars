@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace FriendlyEnvars;
 
-public record EnvarSettings
+public sealed record EnvarSettings
 {
     internal EnvarSettings()
     {

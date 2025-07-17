@@ -6,10 +6,10 @@ using System.Linq;
 
 namespace FriendlyEnvars;
 
-public class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
+public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
 {
     [StackTraceHidden]
-    public virtual object? Convert(string value, Type targetType, CultureInfo culture)
+    public object? Convert(string value, Type targetType, CultureInfo culture)
     {
         var underlyingType = Nullable.GetUnderlyingType(targetType);
 
