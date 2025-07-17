@@ -10,15 +10,8 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     name: Build and Test
-
-    strategy:
-      matrix:
-        dotnet-version: [ '8.0.x', '9.0.x' ]
-        include:
-          - dotnet-version: '8.0.x'
-            framework: 'net8.0'
-          - dotnet-version: '9.0.x'
-            framework: 'net9.0'
+    env:
+      VersionSuffix: beta-${{ github.run_number }}
 
     steps:
       - uses: actions/checkout@v4
@@ -28,16 +21,16 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-      - name: Setup .NET ${{ matrix.dotnet-version }}
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ matrix.dotnet-version }}
+          dotnet-version: '8.0.x'
 
       - name: Restore
         run: dotnet restore FriendlyEnvars.slnx
 
-      - name: Build ${{ matrix.framework }}
-        run: dotnet build --no-restore --configuration Release --framework ${{ matrix.framework }} FriendlyEnvars.slnx
+      - name: Build
+        run: dotnet build --no-restore --configuration Release --framework net8.0 FriendlyEnvars.slnx
 
-      - name: Test ${{ matrix.framework }}
-        run: dotnet test --no-build --configuration Release --framework ${{ matrix.framework }} --verbosity normal FriendlyEnvars.slnx
+      - name: Test
+        run: dotnet test --no-build --configuration Release --framework net8.0 --verbosity normal FriendlyEnvars.slnx
