@@ -21,7 +21,7 @@
         <PackageProjectUrl>https://github.com/llepecki/friendly-envars</PackageProjectUrl>
         <RepositoryUrl>https://github.com/llepecki/friendly-envars</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
-        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     </PropertyGroup>
     <ItemGroup>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
