@@ -47,7 +47,7 @@ jobs:
           path: TestResults/*.trx
           reporter: dotnet-trx
 
-      - name: Package
+      - name: Pack NuGet Package
         run: dotnet pack --no-build --configuration Release --maxcpucount:1 FriendlyEnvars.slnx
 
       - name: Upload NuGet Package
@@ -55,12 +55,3 @@ jobs:
         with:
           name: nuget-package
           path: src/FriendlyEnvars/bin/Release/*.nupkg
-
-      - name: Publish Package Download Link
-        run: |
-          echo "📦 NuGet Package Generated" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.ref }}" == "refs/heads/master" ]; then
-            echo "[FriendlyEnvars.1.0.0-beta.nupkg](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) of this workflow run" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "[FriendlyEnvars.1.0.0-beta-${{ github.run_number }}.nupkg](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) of this workflow run" >> $GITHUB_STEP_SUMMARY
-          fi
