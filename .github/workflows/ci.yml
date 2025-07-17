@@ -48,7 +48,7 @@ jobs:
           reporter: dotnet-trx
 
       - name: Package
-        run: dotnet pack --no-build --configuration Release FriendlyEnvars.slnx
+        run: dotnet pack --no-build --configuration Release --maxcpucount:1 FriendlyEnvars.slnx
 
       - name: Upload NuGet Package
         uses: actions/upload-artifact@v4
@@ -60,8 +60,7 @@ jobs:
         run: |
           echo "📦 NuGet Package Generated" >> $GITHUB_STEP_SUMMARY
           if [ "${{ github.ref }}" == "refs/heads/master" ]; then
-            echo "- **Package**: FriendlyEnvars.1.0.0-beta.nupkg" >> $GITHUB_STEP_SUMMARY
+            echo "[FriendlyEnvars.1.0.0-beta.nupkg](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) of this workflow run" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- **Package**: FriendlyEnvars.1.0.0-beta-${{ github.run_number }}.nupkg" >> $GITHUB_STEP_SUMMARY
+            echo "[FriendlyEnvars.1.0.0-beta-${{ github.run_number }}.nupkg](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) of this workflow run" >> $GITHUB_STEP_SUMMARY
           fi
-          echo "- **Download**: Available in the [Artifacts section](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) of this workflow run" >> $GITHUB_STEP_SUMMARY
