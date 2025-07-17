@@ -30,7 +30,7 @@ jobs:
         run: dotnet restore FriendlyEnvars.slnx
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release --framework net8.0 FriendlyEnvars.slnx
+        run: dotnet build --no-restore --configuration Release --framework net8.0 --maxcpucount:1 FriendlyEnvars.slnx
 
       - name: Test
         run: dotnet test --no-build --configuration Release --framework net8.0 --verbosity normal FriendlyEnvars.slnx
