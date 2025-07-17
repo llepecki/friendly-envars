@@ -1,7 +1,10 @@
 <Solution>
+    <Folder Name="/resources/">
+        <File Path="resources\icon.png" />
+    </Folder>
     <Folder Name="/root/">
         <File Path=".editorconfig" />
-        <File Path=".github/workflows/ci.yml"/>
+        <File Path=".github/workflows/ci.yml" />
         <File Path=".gitignore" />
         <File Path="README.md" />
         <File Path="LICENSE" />
