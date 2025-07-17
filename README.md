@@ -1,6 +1,6 @@
 # FriendlyEnvars
 
-<img src="resources/icon.png" alt="FriendlyEnvars Logo" width="64" height="64" align="left" style="margin-right: 16px;">
+<img src="resources/icon.png" alt="FriendlyEnvars Logo" width="60" height="60" align="left" style="margin-right: 16px;">
 
 [![CI](https://github.com/llepecki/friendly-envars/actions/workflows/ci.yml/badge.svg)](https://github.com/llepecki/friendly-envars/actions/workflows/ci.yml)
 
@@ -8,7 +8,7 @@ Simple, type-safe environment variable configuration for .NET
 
 ---
 
-## 🚀 Overview
+## 👀 Overview
 
 Do you need to configure your .NET app *purely* via environment variables?
 
@@ -22,17 +22,17 @@ Do you need to configure your .NET app *purely* via environment variables?
 
 ---
 
-## 👀 Why FriendlyEnvars?
+## 📝 Why FriendlyEnvars?
 
 - **Type safety**: Eliminates runtime configuration errors by mapping environment variables directly to typed properties.
 - **Built-in validation**: Leverages data annotation attributes like `[Required]`, `[Range]`, etc. automatically.
-- **No boilerplate:**: No need to write manual parsing, error handling, or default value logic.
+- **No boilerplate**: No need to write manual parsing, error handling, or default value logic.
 - **Works with `IOptions`**: Smooth experience for modern .NET dependency injection patterns.
 - **Explicit & Discoverable:** Your configuration surface is crystal clear in the code.
 
 ---
 
-## 📝 Quick Start
+## 🚀 Quick Start
 
 ### 1. Define Your Configuration Class
 
@@ -102,9 +102,9 @@ public class MyService
 
 **Additional Features:**
 
-- Automatic conversion using invariant culture (by default) or custom culture
-- Custom parsing via `IEnvarPropertyBinder` interface
-- Validation using familiar `DataAnnotations` attributes
+- Automatic conversion using invariant culture (by default) or custom culture.
+- Custom parsing recipes via `IEnvarPropertyBinder` interface.
+- Validation using familiar `DataAnnotations` attributes.
 
 ### ⚙️ Advanced Usage
 
@@ -113,6 +113,8 @@ public class MyService
 By default, conversions use `CultureInfo.InvariantCulture` for predictable parsing. To handle locale-specific formats:
 
 ```csharp
+using System.Globalization;
+
 services.AddOptions<DatabaseSettings>()
     .BindFromEnvarAttributes(settings => {
         settings.UseCulture(CultureInfo.GetCultureInfo("en-US"));
@@ -124,6 +126,10 @@ services.AddOptions<DatabaseSettings>()
 For complex types, implement `IEnvarPropertyBinder` to control parsing:
 
 ```csharp
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+
 public record ConnectionString
 {
     public string Host { get; init; } = string.Empty;

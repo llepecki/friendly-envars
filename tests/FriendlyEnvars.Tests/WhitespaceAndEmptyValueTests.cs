@@ -7,7 +7,6 @@ namespace FriendlyEnvars.Tests;
 
 public class WhitespaceAndEmptyValueTests : EnvarTestsBase
 {
-
     public class WhitespaceOptions
     {
         [Required]

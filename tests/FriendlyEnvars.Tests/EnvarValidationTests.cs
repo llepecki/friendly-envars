@@ -7,7 +7,6 @@ namespace FriendlyEnvars.Tests;
 
 public class EnvarValidationTests : EnvarTestsBase
 {
-
     public class TestOptions
     {
         [Required]

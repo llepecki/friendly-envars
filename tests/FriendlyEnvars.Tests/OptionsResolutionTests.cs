@@ -205,8 +205,7 @@ public class OptionsResolutionTests : EnvarTestsBase
         Assert.Equal("configured", regularOptions.Value.SomeProperty);
 
         // Only FriendlyEnvars options should throw for snapshot/monitor
-        Assert.Throws<NotSupportedException>(() =>
-            serviceProvider.GetRequiredService<IOptionsSnapshot<TestOptions>>());
+        Assert.Throws<NotSupportedException>(() => serviceProvider.GetRequiredService<IOptionsSnapshot<TestOptions>>());
 
         // Regular options should work with snapshot/monitor
         var regularSnapshot = serviceProvider.GetRequiredService<IOptionsSnapshot<AnotherOptions>>();
