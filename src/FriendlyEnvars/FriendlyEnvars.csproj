@@ -10,7 +10,7 @@
     </PropertyGroup>
     <PropertyGroup>
         <PackageId>FriendlyEnvars</PackageId>
-        <VersionPrefix>1.0.0</VersionPrefix>
+        <VersionPrefix>1.0.1</VersionPrefix>
         <VersionSuffix Condition="'$(VersionSuffix)' == ''">beta</VersionSuffix>
         <Authors>Lukasz Lepecki</Authors>
         <Description>A simple replacement for the native .NET configuration that provides configuration ingestion from environment variables to strongly typed DTOs. Compatible with IOptions interface.</Description>
