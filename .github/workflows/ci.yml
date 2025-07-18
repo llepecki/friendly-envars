@@ -55,3 +55,7 @@ jobs:
         with:
           name: nuget-package
           path: src/FriendlyEnvars/bin/Release/*.nupkg
+
+      - name: Publish to NuGet
+        if: github.ref == 'refs/heads/master'
+        run: dotnet nuget push src/FriendlyEnvars/bin/Release/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json

@@ -29,8 +29,8 @@ public static class OptionsBuilderExtensions
     /// </para>
     /// <para>
     /// By default, <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> and 
-    /// <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> resolution will throw 
-    /// <see cref="NotSupportedException"/>. This can be changed using the <paramref name="configure"/> delegate.
+    /// <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> are enabled and will work 
+    /// normally. This can be changed using the <paramref name="configure"/> delegate.
     /// </para>
     /// </remarks>
     /// <example>
@@ -55,7 +55,7 @@ public static class OptionsBuilderExtensions
     ///     {
     ///         settings.UseCulture(CultureInfo.GetCultureInfo("en-US"))
     ///                 .UseCustomEnvarPropertyBinder(new CustomBinder())
-    ///                 .AllowOptionsSnapshot();
+    ///                 .BlockOptionsSnapshot();
     ///     });
     /// </code>
     /// <para>Configuration class example:</para>
@@ -96,7 +96,7 @@ public static class OptionsBuilderExtensions
             optionsBuilder.Services.AddSingleton<IOptionsMonitor<T>>(_ => throw new NotSupportedException(
                 $"IOptionsMonitor<{typeof(T).Name}> is not supported for options bound with FriendlyEnvars. " +
                 "The library assumes that environment variables are static during application runtime. " +
-                "Use IOptions<T> instead or explicitly allow options monitor by calling AllowOptionsMonitor."));
+                "Use IOptions<T> instead or re-enable options monitor by calling AllowOptionsMonitor."));
         }
 
         if (!settings.IsOptionsSnapshotAllowed)
@@ -104,7 +104,7 @@ public static class OptionsBuilderExtensions
             optionsBuilder.Services.AddScoped<IOptionsSnapshot<T>>(_ => throw new NotSupportedException(
                 $"IOptionsSnapshot<{typeof(T).Name}> is not supported for options bound with FriendlyEnvars. " +
                 "The library assumes that environment variables are static during application runtime. " +
-                "Use IOptions<T> instead or explicitly allow options snapshot by calling AllowOptionsSnapshot."));
+                "Use IOptions<T> instead or re-enable options snapshot by calling AllowOptionsSnapshot."));
         }
 
         return optionsBuilder;
