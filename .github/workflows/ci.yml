@@ -14,11 +14,25 @@ jobs:
       contents: read
       actions: read
       checks: write
-    env:
-      VersionSuffix: ${{ github.ref == 'refs/heads/master' && '' || format('pr-{0}', github.run_number) }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set Version Suffix
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            echo "suffix=" >> $GITHUB_OUTPUT
+          else
+            echo "suffix=pr-${{ github.run_number }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Debug Version Info
+        run: |
+          echo "github.ref: ${{ github.ref }}"
+          echo "github.ref_name: ${{ github.ref_name }}"
+          echo "github.event_name: ${{ github.event_name }}"
+          echo "VersionSuffix: ${{ steps.version.outputs.suffix }}"
 
       - name: Setup .NET 9 (for .slnx support)
         uses: actions/setup-dotnet@v4
@@ -34,7 +48,7 @@ jobs:
         run: dotnet restore --maxcpucount:1 FriendlyEnvars.slnx
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release --framework net8.0 --maxcpucount:1 -p:VersionSuffix=${{ env.VersionSuffix }} FriendlyEnvars.slnx
+        run: dotnet build --no-restore --configuration Release --framework net8.0 --maxcpucount:1 -p:VersionSuffix="${{ steps.version.outputs.suffix }}" FriendlyEnvars.slnx
 
       - name: Test
         run: dotnet test --no-restore --no-build --configuration Release --framework net8.0 --maxcpucount:1 --verbosity normal --logger trx --results-directory TestResults FriendlyEnvars.slnx
@@ -48,7 +62,7 @@ jobs:
           reporter: dotnet-trx
 
       - name: Pack NuGet Package
-        run: dotnet pack --no-build --configuration Release --maxcpucount:1 -p:VersionSuffix=${{ env.VersionSuffix }} FriendlyEnvars.slnx
+        run: dotnet pack --no-build --configuration Release --maxcpucount:1 -p:VersionSuffix="${{ steps.version.outputs.suffix }}" FriendlyEnvars.slnx
 
       - name: Extract Package Version
         id: extract-version
