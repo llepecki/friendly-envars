@@ -1,6 +1,6 @@
 # FriendlyEnvars
 
-<img src="resources/icon.png" alt="" width="60" height="60" align="left" style="margin-right: 16px;" title="FriendlyEnvars Logo">
+<img src="resources/icon-1.png" alt="" width="60" height="60" align="left" style="margin-right: 16px;" title="FriendlyEnvars Logo">
 
 [![CI](https://github.com/llepecki/friendly-envars/actions/workflows/ci.yml/badge.svg)](https://github.com/llepecki/friendly-envars/actions/workflows/ci.yml)
 
@@ -15,8 +15,8 @@ Do you need to configure your .NET app *purely* via environment variables?
 **FriendlyEnvars** lets you bind them directly to strongly typed configuration classes.
 
 - Clean, explicit configuration mapping using the `[Envar]` attribute.
-- Zero boilerplate: automatic type conversion, validation, and integration with the `IOptions<T>` pattern.
-- No hidden magic: environment variables are bound once, at startup.
+- Automatic type conversion, validation, and integration with the `IOptions<T>` pattern.
+- Environment variables are bound once, at startup.
 
 **Ideal for:** cloud-native apps, containerized deployments, microservices, or anywhere configuration comes from the environment.
 
