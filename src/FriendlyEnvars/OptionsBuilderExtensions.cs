@@ -29,20 +29,20 @@ public static class OptionsBuilderExtensions
     /// </para>
     /// <para>
     /// By default, <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> and 
-    /// <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> resolution will throw 
-    /// <see cref="NotSupportedException"/>. This can be changed using the <paramref name="configure"/> delegate.
+    /// <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> are enabled and will work 
+    /// normally. This can be changed using the <paramref name="configure"/> delegate.
     /// </para>
     /// </remarks>
     /// <example>
     /// <para>Basic usage:</para>
     /// <code>
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvarAttributes();
+    ///     .BindFromEnvars();
     /// </code>
     /// <para>With validation:</para>
     /// <code>
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvarAttributes()
+    ///     .BindFromEnvars()
     ///     .ValidateDataAnnotations()
     ///     .ValidateOnStart();
     /// </code>
@@ -51,11 +51,11 @@ public static class OptionsBuilderExtensions
     /// using System.Globalization;
     /// 
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvarAttributes(settings =&gt;
+    ///     .BindFromEnvars(settings =&gt;
     ///     {
     ///         settings.UseCulture(CultureInfo.GetCultureInfo("en-US"))
     ///                 .UseCustomEnvarPropertyBinder(new CustomBinder())
-    ///                 .AllowOptionsSnapshot();
+    ///                 .BlockOptionsSnapshot();
     ///     });
     /// </code>
     /// <para>Configuration class example:</para>
@@ -81,7 +81,7 @@ public static class OptionsBuilderExtensions
     /// DB_SSL_ENABLED=false
     /// </code>
     /// </example>
-    public static OptionsBuilder<T> BindFromEnvarAttributes<T>(this OptionsBuilder<T> optionsBuilder, Action<EnvarSettings>? configure = null) where T : class, new()
+    public static OptionsBuilder<T> BindFromEnvars<T>(this OptionsBuilder<T> optionsBuilder, Action<EnvarSettings>? configure = null) where T : class, new()
     {
         var settings = new EnvarSettings();
         configure?.Invoke(settings);
@@ -89,14 +89,14 @@ public static class OptionsBuilderExtensions
         optionsBuilder.Configure(_ => { });
 
         optionsBuilder.Services.AddSingleton<IConfigureOptions<T>>(
-            new ConfigureNamedOptions<T>(optionsBuilder.Name, options => BindFromEnvars(options, settings.EnvarPropertyBinder, settings.Culture)));
+            new ConfigureNamedOptions<T>(optionsBuilder.Name, options => Bind(options, settings.EnvarPropertyBinder, settings.Culture)));
 
         if (!settings.IsOptionsMonitorAllowed)
         {
             optionsBuilder.Services.AddSingleton<IOptionsMonitor<T>>(_ => throw new NotSupportedException(
                 $"IOptionsMonitor<{typeof(T).Name}> is not supported for options bound with FriendlyEnvars. " +
                 "The library assumes that environment variables are static during application runtime. " +
-                "Use IOptions<T> instead or explicitly allow options monitor by calling AllowOptionsMonitor."));
+                "Use IOptions<T> instead or re-enable options monitor by calling AllowOptionsMonitor."));
         }
 
         if (!settings.IsOptionsSnapshotAllowed)
@@ -104,14 +104,14 @@ public static class OptionsBuilderExtensions
             optionsBuilder.Services.AddScoped<IOptionsSnapshot<T>>(_ => throw new NotSupportedException(
                 $"IOptionsSnapshot<{typeof(T).Name}> is not supported for options bound with FriendlyEnvars. " +
                 "The library assumes that environment variables are static during application runtime. " +
-                "Use IOptions<T> instead or explicitly allow options snapshot by calling AllowOptionsSnapshot."));
+                "Use IOptions<T> instead or re-enable options snapshot by calling AllowOptionsSnapshot."));
         }
 
         return optionsBuilder;
     }
 
     [StackTraceHidden]
-    private static void BindFromEnvars<T>(T instance, IEnvarPropertyBinder binder, CultureInfo culture)
+    private static void Bind<T>(T instance, IEnvarPropertyBinder binder, CultureInfo culture)
     {
         var type = typeof(T);
 

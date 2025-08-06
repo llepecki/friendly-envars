@@ -1,6 +1,6 @@
 # FriendlyEnvars
 
-<img src="resources/icon.png" alt="FriendlyEnvars Logo" width="60" height="60" align="left" style="margin-right: 16px;">
+<img src="resources/icon-1.png" alt="" width="60" height="60" align="left" style="margin-right: 16px;" title="FriendlyEnvars Logo">
 
 [![CI](https://github.com/llepecki/friendly-envars/actions/workflows/ci.yml/badge.svg)](https://github.com/llepecki/friendly-envars/actions/workflows/ci.yml)
 
@@ -12,11 +12,11 @@ Simple, type-safe environment variable configuration for .NET
 
 Do you need to configure your .NET app *purely* via environment variables?
 
-**FriendlyEnvars** lets you bind them directly to strongly-typed configuration classes.
+**FriendlyEnvars** lets you bind them directly to strongly typed configuration classes.
 
 - Clean, explicit configuration mapping using the `[Envar]` attribute.
-- Zero boilerplate: automatic type conversion, validation, and integration with the `IOptions<T>` pattern.
-- No hidden magic: environment variables are bound once, at startup.
+- Automatic type conversion, validation, and integration with the `IOptions<T>` pattern.
+- Environment variables are bound once, at startup.
 
 **Ideal for:** cloud-native apps, containerized deployments, microservices, or anywhere configuration comes from the environment.
 
@@ -62,7 +62,7 @@ Hook up configuration binding in your Startup.cs or DI setup:
 ```csharp
 services
     .AddOptions<DatabaseSettings>()
-    .BindFromEnvarAttributes();
+    .BindFromEnvars();
 ```
 
 ### 3. Add Validation (Optional)
@@ -72,7 +72,7 @@ Validate environment variables using standard data annotation attributes:
 ```csharp
 services
     .AddOptions<DatabaseSettings>()
-    .BindFromEnvarAttributes()
+    .BindFromEnvars()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 ```
@@ -116,7 +116,7 @@ By default, conversions use `CultureInfo.InvariantCulture` for predictable parsi
 using System.Globalization;
 
 services.AddOptions<DatabaseSettings>()
-    .BindFromEnvarAttributes(settings => {
+    .BindFromEnvars(settings => {
         settings.UseCulture(CultureInfo.GetCultureInfo("en-US"));
     });
 ```
@@ -191,7 +191,7 @@ Then, configure the binder:
 
 ```csharp
 services.AddOptions<DatabaseSettings>()
-    .BindFromEnvarAttributes(settings =>
+    .BindFromEnvars(settings =>
     {
         settings.UseCustomEnvarPropertyBinder(new CustomEnvarPropertyBinder());
     });
@@ -199,23 +199,25 @@ services.AddOptions<DatabaseSettings>()
 
 #### Working with `IOptionsSnapshot` and `IOptionsMonitor`
 
-By default, environment variable configs do not refresh at runtime.
-You can enable support for `IOptionsSnapshot<T>` and `IOptionsMonitor<T>`, but they will always reflect the value from app startup:
+By default, `IOptionsSnapshot<T>` and `IOptionsMonitor<T>` are enabled and will always reflect the values from app startup.
+Environment variable configs do not refresh at runtime.
+
+You can disable support for `IOptionsSnapshot<T>` and `IOptionsMonitor<T>` if you want to ensure only `IOptions<T>` is used:
 
 ```csharp
 services.AddOptions<DatabaseSettings>()
-    .BindFromEnvarAttributes(settings =>
+    .BindFromEnvars(settings =>
     {
         settings
-            .AllowOptionsSnapshot()
-            .AllowOptionsMonitor();
+            .BlockOptionsSnapshot()
+            .BlockOptionsMonitor();
     });
 ```
 
 ### ⚠️ Limitations
 
 - No runtime refresh: environment variables are read once on application startup.
-- `IOptionsSnapshot` and `IOptionsMonitor` are disabled by default, but can be enabled as read-only views.
+- `IOptionsSnapshot` and `IOptionsMonitor` are enabled by default as read-only views, but can be disabled if needed.
 
 ---
 

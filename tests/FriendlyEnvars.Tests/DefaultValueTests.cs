@@ -23,11 +23,9 @@ public class DefaultValueTests : EnvarTestsBase
     [Fact]
     public void BindFromEnvironmentVariables_WithMissingEnvars_ShouldPreserveDefaults()
     {
-        // Don't set any environment variables
-
         var services = new ServiceCollection();
         services.AddOptions<DefaultValueOptions>()
-            .BindFromEnvarAttributes();
+            .BindFromEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<DefaultValueOptions>>().Value;
@@ -47,7 +45,7 @@ public class DefaultValueTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<DefaultValueOptions>()
-            .BindFromEnvarAttributes();
+            .BindFromEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<DefaultValueOptions>>().Value;
@@ -61,12 +59,11 @@ public class DefaultValueTests : EnvarTestsBase
     public void BindFromEnvironmentVariables_WithSomeSetValues_ShouldOverrideOnlyThose()
     {
         SetEnvironmentVariable("DEFAULT_STRING", "NewString");
-        // Don't set DEFAULT_INT
         SetEnvironmentVariable("DEFAULT_BOOL", "false");
 
         var services = new ServiceCollection();
         services.AddOptions<DefaultValueOptions>()
-            .BindFromEnvarAttributes();
+            .BindFromEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<DefaultValueOptions>>().Value;
