@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 
 namespace FriendlyEnvars;
@@ -13,9 +14,9 @@ namespace FriendlyEnvars;
 /// <example>
 /// <code>
 /// using System.Globalization;
-/// 
+///
 /// services.AddOptions&lt;DatabaseSettings&gt;()
-///     .BindFromEnvarAttributes(settings =&gt;
+///     .BindFromEnvars(settings =&gt;
 ///     {
 ///         settings.UseCustomEnvarPropertyBinder(new CustomBinder())
 ///                 .UseCulture(CultureInfo.GetCultureInfo("en-US"))
@@ -67,7 +68,7 @@ public sealed record EnvarSettings
     /// <para>Usage:</para>
     /// <code>
     /// services.AddOptions&lt;MyConfig&gt;()
-    ///     .BindFromEnvarAttributes(settings =&gt;
+    ///     .BindFromEnvars(settings =&gt;
     ///     {
     ///         settings.UseCustomEnvarPropertyBinder(new CustomBinder());
     ///     });
@@ -86,8 +87,8 @@ public sealed record EnvarSettings
     /// <returns>A new <see cref="EnvarSettings"/> instance with the specified culture.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="culture"/> is null.</exception>
     /// <remarks>
-    /// By default, <see cref="CultureInfo.InvariantCulture"/> is used to ensure consistent 
-    /// parsing regardless of the system locale. Use this method when environment variables 
+    /// By default, <see cref="CultureInfo.InvariantCulture"/> is used to ensure consistent
+    /// parsing regardless of the system locale. Use this method when environment variables
     /// contain culture-specific formats.
     /// </remarks>
     /// <example>
@@ -96,7 +97,7 @@ public sealed record EnvarSettings
     /// using System.Globalization;
     /// 
     /// services.AddOptions&lt;MyConfig&gt;()
-    ///     .BindFromEnvarAttributes(settings =&gt;
+    ///     .BindFromEnvars(settings =&gt;
     ///     {
     ///         settings.UseCulture(CultureInfo.GetCultureInfo("de-DE"));
     ///     });
@@ -119,12 +120,12 @@ public sealed record EnvarSettings
     /// <returns>A new <see cref="EnvarSettings"/> instance with options snapshot enabled.</returns>
     /// <remarks>
     /// <para>
-    /// By default, <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> is enabled 
-    /// and will always return the same values that were read at application startup.
+    /// By default, <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> is enabled
+    /// and will always return the same values read at application startup.
     /// </para>
     /// <para>
-    /// Environment variables are static during application runtime, so 
-    /// <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> provides no additional 
+    /// Environment variables are static during application runtime, so
+    /// <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> provides no additional
     /// benefit over <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/>.
     /// </para>
     /// </remarks>
@@ -132,7 +133,7 @@ public sealed record EnvarSettings
     /// <para>Configuration:</para>
     /// <code>
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvarAttributes(settings =&gt;
+    ///     .BindFromEnvars(settings =&gt;
     ///     {
     ///         settings.AllowOptionsSnapshot();
     ///     });
@@ -160,13 +161,13 @@ public sealed record EnvarSettings
     /// <returns>A new <see cref="EnvarSettings"/> instance with options monitor enabled.</returns>
     /// <remarks>
     /// <para>
-    /// By default, <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> is enabled 
-    /// and will always return the same values that were read at application startup and will never 
+    /// By default, <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> is enabled
+    /// and will always return the same values read at application startup and will never 
     /// trigger change notifications.
     /// </para>
     /// <para>
-    /// Environment variables are static during application runtime, so 
-    /// <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> provides no additional 
+    /// Environment variables are static during application runtime, so
+    /// <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> provides no additional
     /// benefit over <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/>.
     /// </para>
     /// </remarks>
@@ -174,7 +175,7 @@ public sealed record EnvarSettings
     /// <para>Configuration:</para>
     /// <code>
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvarAttributes(settings =&gt;
+    ///     .BindFromEnvars(settings =&gt;
     ///     {
     ///         settings.AllowOptionsMonitor();
     ///     });
@@ -223,11 +224,11 @@ public sealed record EnvarSettings
     /// <returns>A new <see cref="EnvarSettings"/> instance with options snapshot disabled.</returns>
     /// <remarks>
     /// <para>
-    /// When disabled, <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> resolution 
+    /// When disabled, <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> resolution
     /// will throw a <see cref="NotSupportedException"/>.
     /// </para>
     /// <para>
-    /// This is useful when you want to ensure that only <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/> 
+    /// This is useful when you want to ensure that only <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/>
     /// is used and prevent accidental injection of snapshot-based options.
     /// </para>
     /// </remarks>
@@ -235,7 +236,7 @@ public sealed record EnvarSettings
     /// <para>Configuration:</para>
     /// <code>
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvarAttributes(settings =&gt;
+    ///     .BindFromEnvars(settings =&gt;
     ///     {
     ///         settings.BlockOptionsSnapshot();
     ///     });
@@ -261,11 +262,11 @@ public sealed record EnvarSettings
     /// <returns>A new <see cref="EnvarSettings"/> instance with options monitor disabled.</returns>
     /// <remarks>
     /// <para>
-    /// When disabled, <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> resolution 
+    /// When disabled, <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> resolution
     /// will throw a <see cref="NotSupportedException"/>.
     /// </para>
     /// <para>
-    /// This is useful when you want to ensure that only <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/> 
+    /// This is useful when you want to ensure that only <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/>
     /// is used and prevent accidental injection of monitor-based options.
     /// </para>
     /// </remarks>
@@ -273,7 +274,7 @@ public sealed record EnvarSettings
     /// <para>Configuration:</para>
     /// <code>
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvarAttributes(settings =&gt;
+    ///     .BindFromEnvars(settings =&gt;
     ///     {
     ///         settings.BlockOptionsMonitor();
     ///     });

@@ -1,6 +1,6 @@
 # FriendlyEnvars
 
-<img src="resources/icon.png" alt="FriendlyEnvars Logo" width="60" height="60" align="left" style="margin-right: 16px;">
+<img src="resources/icon.png" alt="" width="60" height="60" align="left" style="margin-right: 16px;" title="FriendlyEnvars Logo">
 
 [![CI](https://github.com/llepecki/friendly-envars/actions/workflows/ci.yml/badge.svg)](https://github.com/llepecki/friendly-envars/actions/workflows/ci.yml)
 
@@ -12,7 +12,7 @@ Simple, type-safe environment variable configuration for .NET
 
 Do you need to configure your .NET app *purely* via environment variables?
 
-**FriendlyEnvars** lets you bind them directly to strongly-typed configuration classes.
+**FriendlyEnvars** lets you bind them directly to strongly typed configuration classes.
 
 - Clean, explicit configuration mapping using the `[Envar]` attribute.
 - Zero boilerplate: automatic type conversion, validation, and integration with the `IOptions<T>` pattern.
@@ -62,7 +62,7 @@ Hook up configuration binding in your Startup.cs or DI setup:
 ```csharp
 services
     .AddOptions<DatabaseSettings>()
-    .BindFromEnvarAttributes();
+    .BindFromEnvars();
 ```
 
 ### 3. Add Validation (Optional)
@@ -72,7 +72,7 @@ Validate environment variables using standard data annotation attributes:
 ```csharp
 services
     .AddOptions<DatabaseSettings>()
-    .BindFromEnvarAttributes()
+    .BindFromEnvars()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 ```
@@ -116,7 +116,7 @@ By default, conversions use `CultureInfo.InvariantCulture` for predictable parsi
 using System.Globalization;
 
 services.AddOptions<DatabaseSettings>()
-    .BindFromEnvarAttributes(settings => {
+    .BindFromEnvars(settings => {
         settings.UseCulture(CultureInfo.GetCultureInfo("en-US"));
     });
 ```
@@ -191,7 +191,7 @@ Then, configure the binder:
 
 ```csharp
 services.AddOptions<DatabaseSettings>()
-    .BindFromEnvarAttributes(settings =>
+    .BindFromEnvars(settings =>
     {
         settings.UseCustomEnvarPropertyBinder(new CustomEnvarPropertyBinder());
     });
@@ -206,7 +206,7 @@ You can disable support for `IOptionsSnapshot<T>` and `IOptionsMonitor<T>` if yo
 
 ```csharp
 services.AddOptions<DatabaseSettings>()
-    .BindFromEnvarAttributes(settings =>
+    .BindFromEnvars(settings =>
     {
         settings
             .BlockOptionsSnapshot()

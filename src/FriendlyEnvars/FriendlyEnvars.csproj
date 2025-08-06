@@ -10,13 +10,13 @@
     </PropertyGroup>
     <PropertyGroup>
         <PackageId>FriendlyEnvars</PackageId>
-        <VersionPrefix>1.0.1</VersionPrefix>
+        <VersionPrefix>1.0.2</VersionPrefix>
         <VersionSuffix Condition="'$(VersionSuffix)' == ''">beta</VersionSuffix>
         <Authors>Lukasz Lepecki</Authors>
-        <Description>A simple replacement for the native .NET configuration that provides configuration ingestion from environment variables to strongly typed DTOs. Compatible with IOptions interface.</Description>
+        <Description>Simplify your .NET configuration. FriendlyEnvars maps environment variables directly to strongly-typed options classes - no JSON files, no complex setup. Just define your settings class and you're done. Fully compatible with IOptions, naturally integrates with existing codebase.</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageReadmeFile>README.md</PackageReadmeFile>
-        <PackageTags>dotnet;configuration;options;dotnet;environment-variables</PackageTags>
+        <PackageTags>configuration;options;environment-variables</PackageTags>
         <Copyright>Copyright (c) 2025 Lukasz Lepecki</Copyright>
         <PackageProjectUrl>https://github.com/llepecki/friendly-envars</PackageProjectUrl>
         <RepositoryUrl>https://github.com/llepecki/friendly-envars</RepositoryUrl>

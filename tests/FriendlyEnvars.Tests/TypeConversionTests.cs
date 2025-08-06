@@ -65,7 +65,7 @@ public class TypeConversionTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<TypeOptions>()
-            .BindFromEnvarAttributes();
+            .BindFromEnvars();
 
         // Act
         var serviceProvider = services.BuildServiceProvider();
@@ -91,7 +91,7 @@ public class TypeConversionTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<TypeOptions>()
-            .BindFromEnvarAttributes();
+            .BindFromEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<TypeOptions>>().Value);
@@ -109,7 +109,7 @@ public class TypeConversionTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<TypeOptions>()
-            .BindFromEnvarAttributes();
+            .BindFromEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<TypeOptions>>().Value);
@@ -127,7 +127,7 @@ public class TypeConversionTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<TypeOptions>()
-            .BindFromEnvarAttributes();
+            .BindFromEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<TypeOptions>>().Value);

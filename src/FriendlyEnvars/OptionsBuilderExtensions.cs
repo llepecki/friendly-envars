@@ -37,12 +37,12 @@ public static class OptionsBuilderExtensions
     /// <para>Basic usage:</para>
     /// <code>
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvarAttributes();
+    ///     .BindFromEnvars();
     /// </code>
     /// <para>With validation:</para>
     /// <code>
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvarAttributes()
+    ///     .BindFromEnvars()
     ///     .ValidateDataAnnotations()
     ///     .ValidateOnStart();
     /// </code>
@@ -51,7 +51,7 @@ public static class OptionsBuilderExtensions
     /// using System.Globalization;
     /// 
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvarAttributes(settings =&gt;
+    ///     .BindFromEnvars(settings =&gt;
     ///     {
     ///         settings.UseCulture(CultureInfo.GetCultureInfo("en-US"))
     ///                 .UseCustomEnvarPropertyBinder(new CustomBinder())
@@ -81,7 +81,7 @@ public static class OptionsBuilderExtensions
     /// DB_SSL_ENABLED=false
     /// </code>
     /// </example>
-    public static OptionsBuilder<T> BindFromEnvarAttributes<T>(this OptionsBuilder<T> optionsBuilder, Action<EnvarSettings>? configure = null) where T : class, new()
+    public static OptionsBuilder<T> BindFromEnvars<T>(this OptionsBuilder<T> optionsBuilder, Action<EnvarSettings>? configure = null) where T : class, new()
     {
         var settings = new EnvarSettings();
         configure?.Invoke(settings);
@@ -89,7 +89,7 @@ public static class OptionsBuilderExtensions
         optionsBuilder.Configure(_ => { });
 
         optionsBuilder.Services.AddSingleton<IConfigureOptions<T>>(
-            new ConfigureNamedOptions<T>(optionsBuilder.Name, options => BindFromEnvars(options, settings.EnvarPropertyBinder, settings.Culture)));
+            new ConfigureNamedOptions<T>(optionsBuilder.Name, options => Bind(options, settings.EnvarPropertyBinder, settings.Culture)));
 
         if (!settings.IsOptionsMonitorAllowed)
         {
@@ -111,7 +111,7 @@ public static class OptionsBuilderExtensions
     }
 
     [StackTraceHidden]
-    private static void BindFromEnvars<T>(T instance, IEnvarPropertyBinder binder, CultureInfo culture)
+    private static void Bind<T>(T instance, IEnvarPropertyBinder binder, CultureInfo culture)
     {
         var type = typeof(T);
 

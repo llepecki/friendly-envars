@@ -26,7 +26,7 @@ public class OptionsResolutionTests : EnvarTestsBase
         SetEnvironmentVariable("OPTIONAL_SETTING", "optional_value");
 
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindFromEnvarAttributes();
+        services.AddOptions<TestOptions>().BindFromEnvars();
 
         _serviceProvider = services.BuildServiceProvider();
     }
@@ -82,7 +82,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void NamedOptions_IOptions_ShouldResolveCorrectly()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>("MyName").BindFromEnvarAttributes();
+        services.AddOptions<TestOptions>("MyName").BindFromEnvars();
 
         using var serviceProvider = services.BuildServiceProvider();
 
@@ -95,10 +95,10 @@ public class OptionsResolutionTests : EnvarTestsBase
     }
 
     [Fact]
-    public void NamedOptions_IOptionsSnapshot_ShouldWork()
+    public void NamedOptions_IOptionsFactory_ShouldWork()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>("MyName").BindFromEnvarAttributes();
+        services.AddOptions<TestOptions>("MyName").BindFromEnvars();
 
         using var serviceProvider = services.BuildServiceProvider();
 
@@ -111,10 +111,10 @@ public class OptionsResolutionTests : EnvarTestsBase
     }
 
     [Fact]
-    public void NamedOptions_IOptionsMonitor_ShouldWork()
+    public void NamedOptions_IOptionsFactory_ShouldWorkWithFactory()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>("MyName").BindFromEnvarAttributes();
+        services.AddOptions<TestOptions>("MyName").BindFromEnvars();
 
         using var serviceProvider = services.BuildServiceProvider();
 
@@ -130,7 +130,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void IOptionsSnapshot_ShouldThrow_WhenBlocked()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindFromEnvarAttributes(settings =>
+        services.AddOptions<TestOptions>().BindFromEnvars(settings =>
         {
             settings.BlockOptionsSnapshot();
         });
@@ -150,7 +150,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void IOptionsMonitor_ShouldThrow_WhenBlocked()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindFromEnvarAttributes(settings =>
+        services.AddOptions<TestOptions>().BindFromEnvars(settings =>
         {
             settings.BlockOptionsMonitor();
         });
@@ -170,7 +170,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void BothSnapshotAndMonitor_ShouldThrow_WhenBothBlocked()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindFromEnvarAttributes(settings =>
+        services.AddOptions<TestOptions>().BindFromEnvars(settings =>
         {
             settings.BlockOptionsSnapshot().BlockOptionsMonitor();
         });
@@ -191,7 +191,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void MultipleOptionsTypes_ShouldWorkIndependently()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindFromEnvarAttributes();
+        services.AddOptions<TestOptions>().BindFromEnvars();
 
         // Add another options type that doesn't use FriendlyEnvars
         services.Configure<AnotherOptions>(opts => opts.SomeProperty = "configured");
