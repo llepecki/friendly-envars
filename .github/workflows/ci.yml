@@ -15,7 +15,7 @@ jobs:
       actions: read
       checks: write
     env:
-      VersionSuffix: ${{ github.ref == 'refs/heads/master' && '' || format('{0}', github.run_number) }}
+      VersionSuffix: ${{ github.ref == 'refs/heads/master' && '' || format('beta-{0}', github.run_number) }}
 
     steps:
       - uses: actions/checkout@v4
