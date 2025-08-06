@@ -15,7 +15,7 @@ jobs:
       actions: read
       checks: write
     env:
-      VersionSuffix: ${{ github.ref == 'refs/heads/master' && '' || format('beta-{0}', github.run_number) }}
+      VersionSuffix: ${{ github.ref == 'refs/heads/master' && '' || format('pr-{0}', github.run_number) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -34,7 +34,7 @@ jobs:
         run: dotnet restore --maxcpucount:1 FriendlyEnvars.slnx
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release --framework net8.0 --maxcpucount:1 FriendlyEnvars.slnx
+        run: dotnet build --no-restore --configuration Release --framework net8.0 --maxcpucount:1 -p:VersionSuffix=${{ env.VersionSuffix }} FriendlyEnvars.slnx
 
       - name: Test
         run: dotnet test --no-restore --no-build --configuration Release --framework net8.0 --maxcpucount:1 --verbosity normal --logger trx --results-directory TestResults FriendlyEnvars.slnx
@@ -48,7 +48,7 @@ jobs:
           reporter: dotnet-trx
 
       - name: Pack NuGet Package
-        run: dotnet pack --no-build --configuration Release --maxcpucount:1 FriendlyEnvars.slnx
+        run: dotnet pack --no-build --configuration Release --maxcpucount:1 -p:VersionSuffix=${{ env.VersionSuffix }} FriendlyEnvars.slnx
 
       - name: Extract Package Version
         id: extract-version
