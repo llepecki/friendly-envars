@@ -44,7 +44,7 @@ public class EnvarValidationTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>()
-            .BindFromEnvars()
+            .BindEnvars()
             .ValidateDataAnnotations();
 
         var serviceProvider = services.BuildServiceProvider();
@@ -66,7 +66,7 @@ public class EnvarValidationTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>()
-            .BindFromEnvars()
+            .BindEnvars()
             .ValidateDataAnnotations();
 
         var serviceProvider = services.BuildServiceProvider();
@@ -85,7 +85,7 @@ public class EnvarValidationTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>()
-            .BindFromEnvars()
+            .BindEnvars()
             .ValidateDataAnnotations();
 
         var serviceProvider = services.BuildServiceProvider();
@@ -104,7 +104,7 @@ public class EnvarValidationTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>()
-            .BindFromEnvars()
+            .BindEnvars()
             .ValidateDataAnnotations();
 
         var serviceProvider = services.BuildServiceProvider();
@@ -123,7 +123,7 @@ public class EnvarValidationTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>()
-            .BindFromEnvars()
+            .BindEnvars()
             .ValidateDataAnnotations();
 
         var serviceProvider = services.BuildServiceProvider();
@@ -143,7 +143,7 @@ public class EnvarValidationTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>()
-            .BindFromEnvars()
+            .BindEnvars()
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
@@ -168,7 +168,7 @@ public class EnvarValidationTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>()
-            .BindFromEnvars()
+            .BindEnvars()
             .ValidateDataAnnotations();
 
         var serviceProvider = services.BuildServiceProvider();
@@ -188,7 +188,7 @@ public class EnvarValidationTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>()
-            .BindFromEnvars()
+            .BindEnvars()
             .ValidateDataAnnotations();
 
         var serviceProvider = services.BuildServiceProvider();
@@ -209,7 +209,7 @@ public class EnvarValidationTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>()
-            .BindFromEnvars()
+            .BindEnvars()
             .ValidateDataAnnotations();
 
         var serviceProvider = services.BuildServiceProvider();
@@ -228,7 +228,7 @@ public class EnvarValidationTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>()
-            .BindFromEnvars()
+            .BindEnvars()
             .ValidateDataAnnotations()
             .ValidateOnStart();
 

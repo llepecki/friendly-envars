@@ -27,7 +27,7 @@ public class InheritanceTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<DerivedOptions>()
-            .BindFromEnvars();
+            .BindEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<DerivedOptions>>().Value;

@@ -28,7 +28,7 @@ public class WhitespaceAndEmptyValueTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<WhitespaceOptions>()
-            .BindFromEnvars();
+            .BindEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<WhitespaceOptions>>().Value;
@@ -46,7 +46,7 @@ public class WhitespaceAndEmptyValueTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<WhitespaceOptions>()
-            .BindFromEnvars();
+            .BindEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<WhitespaceOptions>>().Value;
@@ -63,7 +63,7 @@ public class WhitespaceAndEmptyValueTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<WhitespaceOptions>()
-            .BindFromEnvars();
+            .BindEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<WhitespaceOptions>>().Value;

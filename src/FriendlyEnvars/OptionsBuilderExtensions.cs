@@ -37,21 +37,21 @@ public static class OptionsBuilderExtensions
     /// <para>Basic usage:</para>
     /// <code>
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvars();
+    ///     .BindEnvars();
     /// </code>
     /// <para>With validation:</para>
     /// <code>
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvars()
+    ///     .BindEnvars()
     ///     .ValidateDataAnnotations()
     ///     .ValidateOnStart();
     /// </code>
     /// <para>With custom configuration:</para>
     /// <code>
     /// using System.Globalization;
-    /// 
+    ///
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvars(settings =&gt;
+    ///     .BindEnvars(settings =&gt;
     ///     {
     ///         settings.UseCulture(CultureInfo.GetCultureInfo("en-US"))
     ///                 .UseCustomEnvarPropertyBinder(new CustomBinder())
@@ -65,11 +65,11 @@ public static class OptionsBuilderExtensions
     ///     [Required]
     ///     [Envar("DB_HOST")]
     ///     public string Host { get; init; } = string.Empty;
-    /// 
+    ///
     ///     [Range(1, 65535)]
     ///     [Envar("DB_PORT")]
     ///     public int Port { get; init; } = 5432;
-    /// 
+    ///
     ///     [Envar("DB_SSL_ENABLED")]
     ///     public bool SslEnabled { get; init; } = true;
     /// }
@@ -81,7 +81,7 @@ public static class OptionsBuilderExtensions
     /// DB_SSL_ENABLED=false
     /// </code>
     /// </example>
-    public static OptionsBuilder<T> BindFromEnvars<T>(this OptionsBuilder<T> optionsBuilder, Action<EnvarSettings>? configure = null) where T : class, new()
+    public static OptionsBuilder<T> BindEnvars<T>(this OptionsBuilder<T> optionsBuilder, Action<EnvarSettings>? configure = null) where T : class, new()
     {
         var settings = new EnvarSettings();
         configure?.Invoke(settings);
@@ -94,17 +94,17 @@ public static class OptionsBuilderExtensions
         if (!settings.IsOptionsMonitorAllowed)
         {
             optionsBuilder.Services.AddSingleton<IOptionsMonitor<T>>(_ => throw new NotSupportedException(
-                $"IOptionsMonitor<{typeof(T).Name}> is not supported for options bound with FriendlyEnvars. " +
-                "The library assumes that environment variables are static during application runtime. " +
-                "Use IOptions<T> instead or re-enable options monitor by calling AllowOptionsMonitor."));
+                $"IOptionsMonitor<{typeof(T).Name}> has been explicitly blocked by calling BlockOptionsMonitor(). " +
+                "Since environment variables are static during application runtime, IOptionsMonitor provides no additional value. " +
+                "Use IOptions<T> instead or remove the BlockOptionsMonitor() call to re-enable."));
         }
 
         if (!settings.IsOptionsSnapshotAllowed)
         {
             optionsBuilder.Services.AddScoped<IOptionsSnapshot<T>>(_ => throw new NotSupportedException(
-                $"IOptionsSnapshot<{typeof(T).Name}> is not supported for options bound with FriendlyEnvars. " +
-                "The library assumes that environment variables are static during application runtime. " +
-                "Use IOptions<T> instead or re-enable options snapshot by calling AllowOptionsSnapshot."));
+                $"IOptionsSnapshot<{typeof(T).Name}> has been explicitly blocked by calling BlockOptionsSnapshot(). " +
+                "Since environment variables are static during application runtime, IOptionsSnapshot provides no additional value. " +
+                "Use IOptions<T> instead or remove the BlockOptionsSnapshot() call to re-enable."));
         }
 
         return optionsBuilder;

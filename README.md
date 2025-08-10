@@ -62,7 +62,7 @@ Hook up configuration binding in your Startup.cs or DI setup:
 ```csharp
 services
     .AddOptions<DatabaseSettings>()
-    .BindFromEnvars();
+    .BindEnvars();
 ```
 
 ### 3. Add Validation (Optional)
@@ -72,7 +72,7 @@ Validate environment variables using standard data annotation attributes:
 ```csharp
 services
     .AddOptions<DatabaseSettings>()
-    .BindFromEnvars()
+    .BindEnvars()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 ```
@@ -116,7 +116,7 @@ By default, conversions use `CultureInfo.InvariantCulture` for predictable parsi
 using System.Globalization;
 
 services.AddOptions<DatabaseSettings>()
-    .BindFromEnvars(settings => {
+    .BindEnvars(settings => {
         settings.UseCulture(CultureInfo.GetCultureInfo("en-US"));
     });
 ```
@@ -191,7 +191,7 @@ Then, configure the binder:
 
 ```csharp
 services.AddOptions<DatabaseSettings>()
-    .BindFromEnvars(settings =>
+    .BindEnvars(settings =>
     {
         settings.UseCustomEnvarPropertyBinder(new CustomEnvarPropertyBinder());
     });
@@ -206,7 +206,7 @@ You can disable support for `IOptionsSnapshot<T>` and `IOptionsMonitor<T>` if yo
 
 ```csharp
 services.AddOptions<DatabaseSettings>()
-    .BindFromEnvars(settings =>
+    .BindEnvars(settings =>
     {
         settings
             .BlockOptionsSnapshot()
