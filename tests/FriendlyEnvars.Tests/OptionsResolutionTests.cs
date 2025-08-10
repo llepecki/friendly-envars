@@ -26,7 +26,7 @@ public class OptionsResolutionTests : EnvarTestsBase
         SetEnvironmentVariable("OPTIONAL_SETTING", "optional_value");
 
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindFromEnvars();
+        services.AddOptions<TestOptions>().BindEnvars();
 
         _serviceProvider = services.BuildServiceProvider();
     }
@@ -82,7 +82,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void NamedOptions_IOptions_ShouldResolveCorrectly()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>("MyName").BindFromEnvars();
+        services.AddOptions<TestOptions>("MyName").BindEnvars();
 
         using var serviceProvider = services.BuildServiceProvider();
 
@@ -98,7 +98,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void NamedOptions_IOptionsFactory_ShouldWork()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>("MyName").BindFromEnvars();
+        services.AddOptions<TestOptions>("MyName").BindEnvars();
 
         using var serviceProvider = services.BuildServiceProvider();
 
@@ -114,7 +114,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void NamedOptions_IOptionsFactory_ShouldWorkWithFactory()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>("MyName").BindFromEnvars();
+        services.AddOptions<TestOptions>("MyName").BindEnvars();
 
         using var serviceProvider = services.BuildServiceProvider();
 
@@ -130,7 +130,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void IOptionsSnapshot_ShouldThrow_WhenBlocked()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindFromEnvars(settings =>
+        services.AddOptions<TestOptions>().BindEnvars(settings =>
         {
             settings.BlockOptionsSnapshot();
         });
@@ -141,7 +141,8 @@ public class OptionsResolutionTests : EnvarTestsBase
             serviceProvider.GetRequiredService<IOptionsSnapshot<TestOptions>>());
             
         Assert.Contains("IOptionsSnapshot<TestOptions>", exception.Message);
-        Assert.Contains("not supported", exception.Message);
+        Assert.Contains("has been explicitly blocked", exception.Message);
+        Assert.Contains("BlockOptionsSnapshot()", exception.Message);
         Assert.Contains("Use IOptions<T> instead", exception.Message);
         Assert.Contains("environment variables are static", exception.Message);
     }
@@ -150,7 +151,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void IOptionsMonitor_ShouldThrow_WhenBlocked()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindFromEnvars(settings =>
+        services.AddOptions<TestOptions>().BindEnvars(settings =>
         {
             settings.BlockOptionsMonitor();
         });
@@ -161,7 +162,8 @@ public class OptionsResolutionTests : EnvarTestsBase
             serviceProvider.GetRequiredService<IOptionsMonitor<TestOptions>>());
             
         Assert.Contains("IOptionsMonitor<TestOptions>", exception.Message);
-        Assert.Contains("not supported", exception.Message);
+        Assert.Contains("has been explicitly blocked", exception.Message);
+        Assert.Contains("BlockOptionsMonitor()", exception.Message);
         Assert.Contains("Use IOptions<T> instead", exception.Message);
         Assert.Contains("environment variables are static", exception.Message);
     }
@@ -170,7 +172,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void BothSnapshotAndMonitor_ShouldThrow_WhenBothBlocked()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindFromEnvars(settings =>
+        services.AddOptions<TestOptions>().BindEnvars(settings =>
         {
             settings.BlockOptionsSnapshot().BlockOptionsMonitor();
         });
@@ -191,7 +193,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void MultipleOptionsTypes_ShouldWorkIndependently()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindFromEnvars();
+        services.AddOptions<TestOptions>().BindEnvars();
 
         // Add another options type that doesn't use FriendlyEnvars
         services.Configure<AnotherOptions>(opts => opts.SomeProperty = "configured");

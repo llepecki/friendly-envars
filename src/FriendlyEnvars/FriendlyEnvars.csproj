@@ -13,7 +13,7 @@
     </PropertyGroup>
     <PropertyGroup>
         <PackageId>FriendlyEnvars</PackageId>
-        <VersionPrefix>1.0.2</VersionPrefix>
+        <VersionPrefix>1.0.3</VersionPrefix>
         <Authors>Lukasz Lepecki</Authors>
         <Description>Simplify your .NET configuration. FriendlyEnvars maps environment variables directly to strongly-typed options classes - no JSON files, no complex setup. Just define your settings class and you're done. Fully compatible with IOptions, naturally integrates with existing codebase.</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>

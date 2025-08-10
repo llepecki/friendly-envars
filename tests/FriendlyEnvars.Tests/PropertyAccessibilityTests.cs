@@ -28,7 +28,7 @@ public class PropertyAccessibilityTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<InvalidPropertyOptions>()
-            .BindFromEnvars();
+            .BindEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<InvalidPropertyOptions>>().Value);
@@ -44,7 +44,7 @@ public class PropertyAccessibilityTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<SkippedPropertyOptions>()
-            .BindFromEnvars();
+            .BindEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<SkippedPropertyOptions>>().Value;

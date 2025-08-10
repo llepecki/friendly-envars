@@ -7,8 +7,8 @@ namespace FriendlyEnvars;
 /// Configuration settings for environment variable binding behavior.
 /// </summary>
 /// <remarks>
-/// This record provides a fluent API for configuring how environment variables 
-/// are bound to configuration objects, including type conversion, culture settings, 
+/// This record provides a fluent API for configuring how environment variables
+/// are bound to configuration objects, including type conversion, culture settings,
 /// and options pattern behavior.
 /// </remarks>
 /// <example>
@@ -16,12 +16,11 @@ namespace FriendlyEnvars;
 /// using System.Globalization;
 ///
 /// services.AddOptions&lt;DatabaseSettings&gt;()
-///     .BindFromEnvars(settings =&gt;
+///     .BindEnvars(settings =&gt;
 ///     {
-///         settings.UseCustomEnvarPropertyBinder(new CustomBinder())
-///                 .UseCulture(CultureInfo.GetCultureInfo("en-US"))
-///                 .AllowOptionsSnapshot()
-///                 .AllowOptionsMonitor();
+///         settings
+///             .UseCustomEnvarPropertyBinder(new CustomBinder())
+///             .UseCulture(CultureInfo.GetCultureInfo("en-US"));
 ///     });
 /// </code>
 /// </example>
@@ -68,7 +67,7 @@ public sealed record EnvarSettings
     /// <para>Usage:</para>
     /// <code>
     /// services.AddOptions&lt;MyConfig&gt;()
-    ///     .BindFromEnvars(settings =&gt;
+    ///     .BindEnvars(settings =&gt;
     ///     {
     ///         settings.UseCustomEnvarPropertyBinder(new CustomBinder());
     ///     });
@@ -97,7 +96,7 @@ public sealed record EnvarSettings
     /// using System.Globalization;
     /// 
     /// services.AddOptions&lt;MyConfig&gt;()
-    ///     .BindFromEnvars(settings =&gt;
+    ///     .BindEnvars(settings =&gt;
     ///     {
     ///         settings.UseCulture(CultureInfo.GetCultureInfo("de-DE"));
     ///     });
@@ -111,90 +110,6 @@ public sealed record EnvarSettings
     public EnvarSettings UseCulture(CultureInfo culture)
     {
         Culture = culture;
-        return this;
-    }
-
-    /// <summary>
-    /// Allows <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> to be resolved.
-    /// </summary>
-    /// <returns>A new <see cref="EnvarSettings"/> instance with options snapshot enabled.</returns>
-    /// <remarks>
-    /// <para>
-    /// By default, <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> is enabled
-    /// and will always return the same values read at application startup.
-    /// </para>
-    /// <para>
-    /// Environment variables are static during application runtime, so
-    /// <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> provides no additional
-    /// benefit over <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/>.
-    /// </para>
-    /// </remarks>
-    /// <example>
-    /// <para>Configuration:</para>
-    /// <code>
-    /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvars(settings =&gt;
-    ///     {
-    ///         settings.AllowOptionsSnapshot();
-    ///     });
-    /// </code>
-    /// <para>Now you can inject IOptionsSnapshot&lt;DatabaseSettings&gt; in your services:</para>
-    /// <code>
-    /// public class MyService
-    /// {
-    ///     public MyService(IOptionsSnapshot&lt;DatabaseSettings&gt; config)
-    ///     {
-    ///         // config.Value will always return the same values from startup
-    ///     }
-    /// }
-    /// </code>
-    /// </example>
-    public EnvarSettings AllowOptionsSnapshot()
-    {
-        IsOptionsSnapshotAllowed = true;
-        return this;
-    }
-
-    /// <summary>
-    /// Allows <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> to be resolved.
-    /// </summary>
-    /// <returns>A new <see cref="EnvarSettings"/> instance with options monitor enabled.</returns>
-    /// <remarks>
-    /// <para>
-    /// By default, <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> is enabled
-    /// and will always return the same values read at application startup and will never 
-    /// trigger change notifications.
-    /// </para>
-    /// <para>
-    /// Environment variables are static during application runtime, so
-    /// <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> provides no additional
-    /// benefit over <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/>.
-    /// </para>
-    /// </remarks>
-    /// <example>
-    /// <para>Configuration:</para>
-    /// <code>
-    /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvars(settings =&gt;
-    ///     {
-    ///         settings.AllowOptionsMonitor();
-    ///     });
-    /// </code>
-    /// <para>Now you can inject IOptionsMonitor&lt;DatabaseSettings&gt; in your services:</para>
-    /// <code>
-    /// public class MyService
-    /// {
-    ///     public MyService(IOptionsMonitor&lt;DatabaseSettings&gt; monitor)
-    ///     {
-    ///         // monitor.CurrentValue will always return the same values from startup
-    ///         // OnChange callbacks will never be triggered
-    ///     }
-    /// }
-    /// </code>
-    /// </example>
-    public EnvarSettings AllowOptionsMonitor()
-    {
-        IsOptionsMonitorAllowed = true;
         return this;
     }
 
@@ -236,7 +151,7 @@ public sealed record EnvarSettings
     /// <para>Configuration:</para>
     /// <code>
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvars(settings =&gt;
+    ///     .BindEnvars(settings =&gt;
     ///     {
     ///         settings.BlockOptionsSnapshot();
     ///     });
@@ -274,7 +189,7 @@ public sealed record EnvarSettings
     /// <para>Configuration:</para>
     /// <code>
     /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindFromEnvars(settings =&gt;
+    ///     .BindEnvars(settings =&gt;
     ///     {
     ///         settings.BlockOptionsMonitor();
     ///     });

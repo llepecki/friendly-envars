@@ -25,7 +25,7 @@ public class DefaultValueTests : EnvarTestsBase
     {
         var services = new ServiceCollection();
         services.AddOptions<DefaultValueOptions>()
-            .BindFromEnvars();
+            .BindEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<DefaultValueOptions>>().Value;
@@ -45,7 +45,7 @@ public class DefaultValueTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<DefaultValueOptions>()
-            .BindFromEnvars();
+            .BindEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<DefaultValueOptions>>().Value;
@@ -63,7 +63,7 @@ public class DefaultValueTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<DefaultValueOptions>()
-            .BindFromEnvars();
+            .BindEnvars();
 
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<DefaultValueOptions>>().Value;
