@@ -1,7 +1,5 @@
 # FriendlyEnvars
 
-<img src="resources/icon-1.png" alt="" width="60" height="60" align="left" style="margin-right: 16px;" title="FriendlyEnvars Logo">
-
 [![CI](https://github.com/llepecki/friendly-envars/actions/workflows/ci.yml/badge.svg)](https://github.com/llepecki/friendly-envars/actions/workflows/ci.yml)
 
 Simple, type-safe environment variable configuration for .NET
@@ -96,7 +94,7 @@ public class MyService
 - `string`, `char`, `bool`
 - Numeric types: `byte`, `sbyte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `float`, `double`, `decimal`
 - `Guid`, `Uri`, `TimeSpan`, `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`
-- `Enum` (case-insensitive)
+- `Enum` (case-insensitive, including `[Flags]` enums)
 - Nullable versions of all above types
 - Any type with a `TypeConverter`
 
@@ -213,6 +211,17 @@ services.AddOptions<DatabaseSettings>()
             .BlockOptionsMonitor();
     });
 ```
+
+### ⚠️ Breaking Changes
+
+#### Empty Environment Variables (v2.x)
+
+Previously, environment variables set to an empty string (`""`) were treated the same as unset variables — the property would retain its default value. Now, empty strings are passed to the binder. This means:
+
+- `string` properties will be set to `""` instead of keeping their default.
+- Non-string properties (e.g., `int`, `bool`) will throw a `FormatException` wrapped in `EnvarsException` if the environment variable is empty.
+
+If you relied on the old behavior of ignoring empty values, either unset the variable entirely or use a custom `IEnvarPropertyBinder` to handle empty strings.
 
 ### ⚠️ Limitations
 

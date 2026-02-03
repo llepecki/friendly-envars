@@ -13,7 +13,22 @@
     </PropertyGroup>
     <PropertyGroup>
         <PackageId>FriendlyEnvars</PackageId>
-        <VersionPrefix>1.0.3</VersionPrefix>
+        <VersionPrefix>1.1.0</VersionPrefix>
+        <PackageReleaseNotes>
+## Breaking Changes
+- Empty environment variables ("") are now passed to the binder instead of being treated as unset. String properties will be set to "" instead of keeping defaults; non-string properties will throw FormatException for empty values.
+
+## New Features
+- [Flags] enum support for combined values (e.g., "Read, Write")
+
+## Bug Fixes
+- Fixed enum values not being returned from the binder
+- TypeConverter conversions now respect the configured culture setting
+- Changed char parsing to use char.Parse() for clearer error messages
+
+## Performance
+- Added property metadata caching to avoid repeated reflection
+        </PackageReleaseNotes>
         <Authors>Lukasz Lepecki</Authors>
         <Description>Simplify your .NET configuration. FriendlyEnvars maps environment variables directly to strongly-typed options classes - no JSON files, no complex setup. Just define your settings class and you're done. Fully compatible with IOptions, naturally integrates with existing codebase.</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>

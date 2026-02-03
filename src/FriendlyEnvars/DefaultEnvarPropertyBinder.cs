@@ -2,7 +2,6 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
-using System.Linq;
 
 namespace FriendlyEnvars;
 
@@ -22,16 +21,19 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
         {
             var parsedEnum = Enum.Parse(targetType, value, true);
 
-            if (!Enum.IsDefined(targetType, parsedEnum))
+            var isFlagsEnum = targetType.IsDefined(typeof(FlagsAttribute), inherit: false);
+            if (!isFlagsEnum && !Enum.IsDefined(targetType, parsedEnum))
             {
                 throw new ArgumentOutOfRangeException(nameof(value), value, $"Value '{value}' is not a valid member of the '{targetType.Name}' enum");
             }
+
+            return parsedEnum;
         }
 
         return targetType switch
         {
             _ when targetType == typeof(string) => value,
-            _ when targetType == typeof(char) => value.Single(),
+            _ when targetType == typeof(char) => char.Parse(value),
             _ when targetType == typeof(bool) => bool.Parse(value),
             _ when targetType == typeof(byte) => byte.Parse(value, NumberStyles.Integer, culture),
             _ when targetType == typeof(sbyte) => sbyte.Parse(value, NumberStyles.Integer, culture),
@@ -51,14 +53,14 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
             _ when targetType == typeof(DateTimeOffset) => DateTimeOffset.Parse(value, culture),
             _ when targetType == typeof(DateOnly) => DateOnly.Parse(value, culture),
             _ when targetType == typeof(TimeOnly) => TimeOnly.Parse(value, culture),
-            _ => ConvertUsingTypeConverter(value, targetType)
+            _ => ConvertUsingTypeConverter(value, targetType, culture)
         };
     }
 
     [StackTraceHidden]
-    private static object? ConvertUsingTypeConverter(string value, Type targetType)
+    private static object? ConvertUsingTypeConverter(string value, Type targetType, CultureInfo culture)
     {
         var converter = TypeDescriptor.GetConverter(targetType);
-        return converter.ConvertFromString(value);
+        return converter.ConvertFrom(null, culture, value);
     }
 }
