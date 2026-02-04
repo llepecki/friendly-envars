@@ -54,13 +54,14 @@ public interface IEnvarPropertyBinder
     /// <param name="targetType">The target type to convert to.</param>
     /// <param name="culture">The culture to use for conversion (e.g., for numeric and date parsing).</param>
     /// <returns>The converted value, or null if the conversion results in a null value.</returns>
-    /// <exception cref="ArgumentException">Thrown when the value cannot be converted to the target type.</exception>
+    /// <exception cref="ArgumentException">Thrown when the value can't be converted to the target type.</exception>
     /// <exception cref="FormatException">Thrown when the value format is invalid for the target type.</exception>
     /// <exception cref="OverflowException">Thrown when the value is outside the range of the target type.</exception>
     /// <remarks>
     /// <para>
     /// This method is called for each property marked with <see cref="EnvarAttribute"/> 
-    /// when the corresponding environment variable has a non-empty value.
+    /// when the corresponding environment variable has a non-null value (empty values
+    /// may be passed).
     /// </para>
     /// <para>
     /// The implementation should handle nullable types by checking if the target type 

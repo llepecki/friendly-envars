@@ -88,7 +88,8 @@ public sealed record EnvarSettings
     /// <remarks>
     /// By default, <see cref="CultureInfo.InvariantCulture"/> is used to ensure consistent
     /// parsing regardless of the system locale. Use this method when environment variables
-    /// contain culture-specific formats.
+    /// contain culture-specific formats. This culture is also applied to fallback
+    /// <see cref="System.ComponentModel.TypeConverter"/> conversions in the default binder.
     /// </remarks>
     /// <example>
     /// <para>For European number formats (comma as decimal separator):</para>
@@ -112,6 +113,7 @@ public sealed record EnvarSettings
         Culture = culture;
         return this;
     }
+
 
     /// <summary>
     /// Gets the property binder used for type conversion.
