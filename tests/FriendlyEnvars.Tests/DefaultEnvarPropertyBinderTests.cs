@@ -73,9 +73,9 @@ public class DefaultEnvarPropertyBinderTests
     [InlineData("abc")]
     public void Convert_CharType_ThrowsForInvalidLength(string value)
     {
-        var exception = Assert.Throws<InvalidOperationException>(() => _binder.Convert(value, typeof(char), _invariantCulture));
+        var exception = Assert.Throws<FormatException>(() => _binder.Convert(value, typeof(char), _invariantCulture));
 
-        Assert.Contains("Sequence contains", exception.Message);
+        Assert.Contains("exactly one character", exception.Message);
     }
 
     [Theory]
