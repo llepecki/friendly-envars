@@ -2,7 +2,7 @@ using System;
 
 namespace FriendlyEnvars;
 
-public class EnvarsException : Exception
+public sealed class EnvarsException : Exception
 {
     public EnvarsException()
     {

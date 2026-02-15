@@ -8,7 +8,7 @@ public class EnvarAttributeTests
     [Fact]
     public void Constructor_WithNullName_ShouldThrowArgumentException()
     {
-        var exception = Assert.Throws<ArgumentException>(() => new EnvarAttribute(null!));
+        var exception = Assert.Throws<ArgumentException>(static () => new EnvarAttribute(null!));
 
         Assert.Equal("name", exception.ParamName);
         Assert.Contains("null or empty", exception.Message);
@@ -17,7 +17,7 @@ public class EnvarAttributeTests
     [Fact]
     public void Constructor_WithEmptyName_ShouldThrowArgumentException()
     {
-        var exception = Assert.Throws<ArgumentException>(() => new EnvarAttribute(string.Empty));
+        var exception = Assert.Throws<ArgumentException>(static () => new EnvarAttribute(string.Empty));
 
         Assert.Equal("name", exception.ParamName);
         Assert.Contains("null or empty", exception.Message);

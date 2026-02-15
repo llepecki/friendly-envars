@@ -92,14 +92,14 @@ public static class OptionsBuilderExtensions
         var settings = new EnvarSettings();
         configure?.Invoke(settings);
 
-        optionsBuilder.Configure(_ => { });
+        optionsBuilder.Configure(static _ => { });
 
         optionsBuilder.Services.AddSingleton<IConfigureOptions<T>>(
             new ConfigureNamedOptions<T>(optionsBuilder.Name, options => Bind(options, settings.EnvarPropertyBinder, settings.Culture)));
 
         if (!settings.IsOptionsMonitorAllowed)
         {
-            optionsBuilder.Services.AddSingleton<IOptionsMonitor<T>>(_ => throw new NotSupportedException(
+            optionsBuilder.Services.AddSingleton<IOptionsMonitor<T>>(static _ => throw new NotSupportedException(
                 $"IOptionsMonitor<{typeof(T).Name}> has been explicitly blocked by calling BlockOptionsMonitor(). " +
                 "Since environment variables are static during application runtime, IOptionsMonitor provides no additional value. " +
                 "Use IOptions<T> instead or remove the BlockOptionsMonitor() call to re-enable."));
@@ -107,7 +107,7 @@ public static class OptionsBuilderExtensions
 
         if (!settings.IsOptionsSnapshotAllowed)
         {
-            optionsBuilder.Services.AddScoped<IOptionsSnapshot<T>>(_ => throw new NotSupportedException(
+            optionsBuilder.Services.AddScoped<IOptionsSnapshot<T>>(static _ => throw new NotSupportedException(
                 $"IOptionsSnapshot<{typeof(T).Name}> has been explicitly blocked by calling BlockOptionsSnapshot(). " +
                 "Since environment variables are static during application runtime, IOptionsSnapshot provides no additional value. " +
                 "Use IOptions<T> instead or remove the BlockOptionsSnapshot() call to re-enable."));

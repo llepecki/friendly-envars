@@ -39,7 +39,7 @@ public class WhitespaceAndEmptyValueTests : EnvarTestsBase
     }
 
     [Fact]
-    public void BindFromEnvironmentVariables_WithEmptyValues_ShouldSkipBinding()
+    public void BindFromEnvironmentVariables_WithEmptyStringValue_ShouldBindEmptyString()
     {
         SetEnvironmentVariable("WHITESPACE_REQUIRED", "NonEmpty");
         SetEnvironmentVariable("WHITESPACE_OPTIONAL", "");
@@ -52,7 +52,7 @@ public class WhitespaceAndEmptyValueTests : EnvarTestsBase
         var options = serviceProvider.GetRequiredService<IOptions<WhitespaceOptions>>().Value;
 
         Assert.Equal("NonEmpty", options.RequiredSetting);
-        Assert.Equal("DefaultValue", options.OptionalSetting); // Empty value is skipped, default preserved
+        Assert.Equal("", options.OptionalSetting); // Empty string is a valid value
     }
 
     [Fact]

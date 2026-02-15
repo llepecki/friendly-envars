@@ -51,7 +51,7 @@ Console.WriteLine();
 Console.WriteLine("=== Example 2: Custom Property Binder ===");
 var services2 = new ServiceCollection();
 services2.AddOptions<DatabaseConfig>()
-    .BindFromEnvars(settings =>
+    .BindFromEnvars(static settings =>
     {
         settings.UseCustomEnvarPropertyBinder(new CustomEnvarPropertyBinder());
     })
@@ -148,7 +148,7 @@ Console.WriteLine();
 // Example 6: Host Builder Integration
 Console.WriteLine("=== Example 6: Host Builder Integration ===");
 var hostBuilder = Host.CreateDefaultBuilder()
-    .ConfigureServices(services =>
+    .ConfigureServices(static services =>
     {
         services.AddOptions<DatabaseConfig>()
             .BindFromEnvars()

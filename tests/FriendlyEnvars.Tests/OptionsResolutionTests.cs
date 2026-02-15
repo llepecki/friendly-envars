@@ -130,7 +130,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void IOptionsSnapshot_ShouldThrow_WhenBlocked()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindEnvars(settings =>
+        services.AddOptions<TestOptions>().BindEnvars(static settings =>
         {
             settings.BlockOptionsSnapshot();
         });
@@ -151,7 +151,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void IOptionsMonitor_ShouldThrow_WhenBlocked()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindEnvars(settings =>
+        services.AddOptions<TestOptions>().BindEnvars(static settings =>
         {
             settings.BlockOptionsMonitor();
         });
@@ -172,7 +172,7 @@ public class OptionsResolutionTests : EnvarTestsBase
     public void BothSnapshotAndMonitor_ShouldThrow_WhenBothBlocked()
     {
         var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindEnvars(settings =>
+        services.AddOptions<TestOptions>().BindEnvars(static settings =>
         {
             settings.BlockOptionsSnapshot().BlockOptionsMonitor();
         });
@@ -196,7 +196,7 @@ public class OptionsResolutionTests : EnvarTestsBase
         services.AddOptions<TestOptions>().BindEnvars();
 
         // Add another options type that doesn't use FriendlyEnvars
-        services.Configure<AnotherOptions>(opts => opts.SomeProperty = "configured");
+        services.Configure<AnotherOptions>(static opts => opts.SomeProperty = "configured");
 
         using var serviceProvider = services.BuildServiceProvider();
 

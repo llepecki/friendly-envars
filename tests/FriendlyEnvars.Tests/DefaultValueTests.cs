@@ -37,11 +37,9 @@ public class DefaultValueTests : EnvarTestsBase
     }
 
     [Fact]
-    public void BindFromEnvironmentVariables_WithEmptyValues_ShouldSkipBinding()
+    public void BindFromEnvironmentVariables_WithEmptyStringValue_ShouldBindEmptyString()
     {
         SetEnvironmentVariable("DEFAULT_STRING", "");
-        SetEnvironmentVariable("DEFAULT_INT", "");
-        SetEnvironmentVariable("DEFAULT_BOOL", "");
 
         var services = new ServiceCollection();
         services.AddOptions<DefaultValueOptions>()
@@ -50,9 +48,25 @@ public class DefaultValueTests : EnvarTestsBase
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<DefaultValueOptions>>().Value;
 
-        Assert.Equal("DefaultString", options.StringWithDefaultValue);
+        Assert.Equal("", options.StringWithDefaultValue);
         Assert.Equal(42, options.IntWithDefaultValue);
         Assert.True(options.BoolWithDefaultValue);
+    }
+
+    [Fact]
+    public void BindFromEnvironmentVariables_WithEmptyNonStringValue_ShouldThrow()
+    {
+        SetEnvironmentVariable("DEFAULT_INT", "");
+
+        var services = new ServiceCollection();
+        services.AddOptions<DefaultValueOptions>()
+            .BindEnvars();
+
+        var serviceProvider = services.BuildServiceProvider();
+        var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<DefaultValueOptions>>().Value);
+
+        Assert.Contains("DEFAULT_INT", exception.Message);
+        Assert.Contains("Int32", exception.Message);
     }
 
     [Fact]
