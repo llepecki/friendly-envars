@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using System;
 using System.ComponentModel.DataAnnotations;
 using Xunit;
 
@@ -59,43 +58,39 @@ public class OptionsResolutionTests : EnvarTestsBase
     }
 
     [Fact]
-    public void IOptionsSnapshot_ShouldWork_ByDefault()
+    public void IOptionsSnapshot_ShouldResolveNormally()
     {
-        var snapshot = _serviceProvider.GetRequiredService<IOptionsSnapshot<TestOptions>>();
-        
+        using var scope = _serviceProvider.CreateScope();
+        var snapshot = scope.ServiceProvider.GetRequiredService<IOptionsSnapshot<TestOptions>>();
+
         Assert.NotNull(snapshot);
         Assert.Equal("test_value", snapshot.Value.TestSetting);
         Assert.Equal("optional_value", snapshot.Value.OptionalSetting);
     }
 
     [Fact]
-    public void IOptionsMonitor_ShouldWork_ByDefault()
+    public void IOptionsMonitor_ShouldResolveNormally()
     {
         var monitor = _serviceProvider.GetRequiredService<IOptionsMonitor<TestOptions>>();
-        
+
         Assert.NotNull(monitor);
         Assert.Equal("test_value", monitor.CurrentValue.TestSetting);
         Assert.Equal("optional_value", monitor.CurrentValue.OptionalSetting);
     }
 
     [Fact]
-    public void NamedOptions_IOptions_ShouldResolveCorrectly()
+    public void IOptionsFactory_ShouldResolveNormally()
     {
-        var services = new ServiceCollection();
-        services.AddOptions<TestOptions>("MyName").BindEnvars();
+        var factory = _serviceProvider.GetRequiredService<IOptionsFactory<TestOptions>>();
+        var options = factory.Create(Options.DefaultName);
 
-        using var serviceProvider = services.BuildServiceProvider();
-
-        var options = serviceProvider.GetRequiredService<IOptionsFactory<TestOptions>>();
-        var namedOptions = options.Create("MyName");
-
-        Assert.NotNull(namedOptions);
-        Assert.Equal("test_value", namedOptions.TestSetting);
-        Assert.Equal("optional_value", namedOptions.OptionalSetting);
+        Assert.NotNull(options);
+        Assert.Equal("test_value", options.TestSetting);
+        Assert.Equal("optional_value", options.OptionalSetting);
     }
 
     [Fact]
-    public void NamedOptions_IOptionsFactory_ShouldWork()
+    public void NamedOptions_IOptionsFactory_ShouldResolveNormally()
     {
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>("MyName").BindEnvars();
@@ -104,89 +99,43 @@ public class OptionsResolutionTests : EnvarTestsBase
 
         var optionsFactory = serviceProvider.GetRequiredService<IOptionsFactory<TestOptions>>();
         var namedOptions = optionsFactory.Create("MyName");
-        
+
         Assert.NotNull(namedOptions);
         Assert.Equal("test_value", namedOptions.TestSetting);
         Assert.Equal("optional_value", namedOptions.OptionalSetting);
     }
 
     [Fact]
-    public void NamedOptions_IOptionsFactory_ShouldWorkWithFactory()
+    public void NamedOptions_IOptionsSnapshot_ShouldResolveNormally()
+    {
+        var services = new ServiceCollection();
+        services.AddOptions<TestOptions>("MyName").BindEnvars();
+
+        using var serviceProvider = services.BuildServiceProvider();
+        using var scope = serviceProvider.CreateScope();
+
+        var snapshot = scope.ServiceProvider.GetRequiredService<IOptionsSnapshot<TestOptions>>();
+        var namedOptions = snapshot.Get("MyName");
+
+        Assert.NotNull(namedOptions);
+        Assert.Equal("test_value", namedOptions.TestSetting);
+        Assert.Equal("optional_value", namedOptions.OptionalSetting);
+    }
+
+    [Fact]
+    public void NamedOptions_IOptionsMonitor_ShouldResolveNormally()
     {
         var services = new ServiceCollection();
         services.AddOptions<TestOptions>("MyName").BindEnvars();
 
         using var serviceProvider = services.BuildServiceProvider();
 
-        var optionsFactory = serviceProvider.GetRequiredService<IOptionsFactory<TestOptions>>();
-        var namedOptions = optionsFactory.Create("MyName");
-        
+        var monitor = serviceProvider.GetRequiredService<IOptionsMonitor<TestOptions>>();
+        var namedOptions = monitor.Get("MyName");
+
         Assert.NotNull(namedOptions);
         Assert.Equal("test_value", namedOptions.TestSetting);
         Assert.Equal("optional_value", namedOptions.OptionalSetting);
-    }
-
-    [Fact]
-    public void IOptionsSnapshot_ShouldThrow_WhenBlocked()
-    {
-        var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindEnvars(static settings =>
-        {
-            settings.BlockOptionsSnapshot();
-        });
-
-        using var serviceProvider = services.BuildServiceProvider();
-
-        var exception = Assert.Throws<NotSupportedException>(() =>
-            serviceProvider.GetRequiredService<IOptionsSnapshot<TestOptions>>());
-            
-        Assert.Contains("IOptionsSnapshot<TestOptions>", exception.Message);
-        Assert.Contains("has been explicitly blocked", exception.Message);
-        Assert.Contains("BlockOptionsSnapshot()", exception.Message);
-        Assert.Contains("Use IOptions<T> instead", exception.Message);
-        Assert.Contains("environment variables are static", exception.Message);
-    }
-
-    [Fact]
-    public void IOptionsMonitor_ShouldThrow_WhenBlocked()
-    {
-        var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindEnvars(static settings =>
-        {
-            settings.BlockOptionsMonitor();
-        });
-
-        using var serviceProvider = services.BuildServiceProvider();
-
-        var exception = Assert.Throws<NotSupportedException>(() =>
-            serviceProvider.GetRequiredService<IOptionsMonitor<TestOptions>>());
-            
-        Assert.Contains("IOptionsMonitor<TestOptions>", exception.Message);
-        Assert.Contains("has been explicitly blocked", exception.Message);
-        Assert.Contains("BlockOptionsMonitor()", exception.Message);
-        Assert.Contains("Use IOptions<T> instead", exception.Message);
-        Assert.Contains("environment variables are static", exception.Message);
-    }
-
-    [Fact]
-    public void BothSnapshotAndMonitor_ShouldThrow_WhenBothBlocked()
-    {
-        var services = new ServiceCollection();
-        services.AddOptions<TestOptions>().BindEnvars(static settings =>
-        {
-            settings.BlockOptionsSnapshot().BlockOptionsMonitor();
-        });
-
-        using var serviceProvider = services.BuildServiceProvider();
-
-        // Both should throw
-        var snapshotException = Assert.Throws<NotSupportedException>(() =>
-            serviceProvider.GetRequiredService<IOptionsSnapshot<TestOptions>>());
-        var monitorException = Assert.Throws<NotSupportedException>(() =>
-            serviceProvider.GetRequiredService<IOptionsMonitor<TestOptions>>());
-
-        Assert.Contains("IOptionsSnapshot<TestOptions>", snapshotException.Message);
-        Assert.Contains("IOptionsMonitor<TestOptions>", monitorException.Message);
     }
 
     [Fact]
@@ -208,7 +157,7 @@ public class OptionsResolutionTests : EnvarTestsBase
         var regularOptions = serviceProvider.GetRequiredService<IOptions<AnotherOptions>>();
         Assert.Equal("configured", regularOptions.Value.SomeProperty);
 
-        // FriendlyEnvars options should work for snapshot/monitor by default
+        // FriendlyEnvars options resolve through snapshot and monitor as well
         var friendlySnapshot = serviceProvider.GetRequiredService<IOptionsSnapshot<TestOptions>>();
         Assert.NotNull(friendlySnapshot);
         Assert.Equal("test_value", friendlySnapshot.Value.TestSetting);

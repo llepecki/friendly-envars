@@ -197,20 +197,12 @@ services.AddOptions<DatabaseSettings>()
 
 #### Working with `IOptionsSnapshot` and `IOptionsMonitor`
 
-By default, `IOptionsSnapshot<T>` and `IOptionsMonitor<T>` are enabled and will always reflect the values from app startup.
-Environment variable configs do not refresh at runtime.
+`IOptions<T>`, `IOptionsSnapshot<T>`, `IOptionsMonitor<T>` and `IOptionsFactory<T>` all resolve normally.
+FriendlyEnvars does not replace, block or otherwise interfere with any of them.
 
-You can disable support for `IOptionsSnapshot<T>` and `IOptionsMonitor<T>` if you want to ensure only `IOptions<T>` is used:
-
-```csharp
-services.AddOptions<DatabaseSettings>()
-    .BindEnvars(settings =>
-    {
-        settings
-            .BlockOptionsSnapshot()
-            .BlockOptionsMonitor();
-    });
-```
+Because environment variables do not change while the process runs, every one of these abstractions
+observes the same values. `IOptionsSnapshot<T>` and `IOptionsMonitor<T>` will not pick up a variable
+that is changed after startup.
 
 ### ⚠️ Breaking Changes
 
@@ -226,7 +218,7 @@ If you relied on the old behavior of ignoring empty values, either unset the var
 ### ⚠️ Limitations
 
 - No runtime refresh: environment variables are read once on application startup.
-- `IOptionsSnapshot` and `IOptionsMonitor` are enabled by default as read-only views, but can be disabled if needed.
+- `IOptionsSnapshot` and `IOptionsMonitor` resolve normally, but they behave as read-only views of the startup values.
 
 ---
 

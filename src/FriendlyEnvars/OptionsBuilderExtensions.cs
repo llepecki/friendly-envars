@@ -32,9 +32,12 @@ public static class OptionsBuilderExtensions
     /// is not set, the property retains its default value. Empty values are passed to the binder.
     /// </para>
     /// <para>
-    /// By default, <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> and 
-    /// <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> are enabled and will work 
-    /// normally. This can be changed using the <paramref name="configure"/> delegate.
+    /// <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/>,
+    /// <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/>,
+    /// <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> and
+    /// <see cref="Microsoft.Extensions.Options.IOptionsFactory{TOptions}"/> all resolve normally.
+    /// Environment variables do not change while the process runs, so every one of them observes the
+    /// same values.
     /// </para>
     /// </remarks>
     /// <example>
@@ -58,8 +61,7 @@ public static class OptionsBuilderExtensions
     ///     .BindEnvars(settings =&gt;
     ///     {
     ///         settings.UseCulture(CultureInfo.GetCultureInfo("en-US"))
-    ///                 .UseCustomEnvarPropertyBinder(new CustomBinder())
-    ///                 .BlockOptionsSnapshot();
+    ///                 .UseCustomEnvarPropertyBinder(new CustomBinder());
     ///     });
     /// </code>
     /// <para>Configuration class example:</para>
@@ -96,22 +98,6 @@ public static class OptionsBuilderExtensions
 
         optionsBuilder.Services.AddSingleton<IConfigureOptions<T>>(
             new ConfigureNamedOptions<T>(optionsBuilder.Name, options => Bind(options, settings.EnvarPropertyBinder, settings.Culture)));
-
-        if (!settings.IsOptionsMonitorAllowed)
-        {
-            optionsBuilder.Services.AddSingleton<IOptionsMonitor<T>>(static _ => throw new NotSupportedException(
-                $"IOptionsMonitor<{typeof(T).Name}> has been explicitly blocked by calling BlockOptionsMonitor(). " +
-                "Since environment variables are static during application runtime, IOptionsMonitor provides no additional value. " +
-                "Use IOptions<T> instead or remove the BlockOptionsMonitor() call to re-enable."));
-        }
-
-        if (!settings.IsOptionsSnapshotAllowed)
-        {
-            optionsBuilder.Services.AddScoped<IOptionsSnapshot<T>>(static _ => throw new NotSupportedException(
-                $"IOptionsSnapshot<{typeof(T).Name}> has been explicitly blocked by calling BlockOptionsSnapshot(). " +
-                "Since environment variables are static during application runtime, IOptionsSnapshot provides no additional value. " +
-                "Use IOptions<T> instead or remove the BlockOptionsSnapshot() call to re-enable."));
-        }
 
         return optionsBuilder;
     }

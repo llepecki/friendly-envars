@@ -34,16 +34,12 @@ public sealed record EnvarSettings
     /// <list type="bullet">
     /// <item><description>Uses <see cref="DefaultEnvarPropertyBinder"/> for type conversion</description></item>
     /// <item><description>Uses <see cref="CultureInfo.InvariantCulture"/> for parsing</description></item>
-    /// <item><description>Enables <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/></description></item>
-    /// <item><description>Enables <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/></description></item>
     /// </list>
     /// </remarks>
     internal EnvarSettings()
     {
         EnvarPropertyBinder = new DefaultEnvarPropertyBinder();
         Culture = CultureInfo.InvariantCulture;
-        IsOptionsSnapshotAllowed = true;
-        IsOptionsMonitorAllowed = true;
     }
 
     /// <summary>
@@ -114,7 +110,6 @@ public sealed record EnvarSettings
         return this;
     }
 
-
     /// <summary>
     /// Gets the property binder used for type conversion.
     /// </summary>
@@ -124,90 +119,4 @@ public sealed record EnvarSettings
     /// Gets the culture used for type conversion.
     /// </summary>
     internal CultureInfo Culture { get; private set; }
-
-    /// <summary>
-    /// Gets a value indicating whether <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> is allowed.
-    /// </summary>
-    internal bool IsOptionsSnapshotAllowed { get; private set; }
-
-    /// <summary>
-    /// Gets a value indicating whether <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> is allowed.
-    /// </summary>
-    internal bool IsOptionsMonitorAllowed { get; private set; }
-
-    /// <summary>
-    /// Blocks <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> resolution.
-    /// </summary>
-    /// <returns>A new <see cref="EnvarSettings"/> instance with options snapshot disabled.</returns>
-    /// <remarks>
-    /// <para>
-    /// When disabled, <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> resolution
-    /// will throw a <see cref="NotSupportedException"/>.
-    /// </para>
-    /// <para>
-    /// This is useful when you want to ensure that only <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/>
-    /// is used and prevent accidental injection of snapshot-based options.
-    /// </para>
-    /// </remarks>
-    /// <example>
-    /// <para>Configuration:</para>
-    /// <code>
-    /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindEnvars(settings =&gt;
-    ///     {
-    ///         settings.BlockOptionsSnapshot();
-    ///     });
-    /// </code>
-    /// <para>This will throw when trying to inject IOptionsSnapshot&lt;DatabaseSettings&gt;:</para>
-    /// <code>
-    /// public class MyService
-    /// {
-    ///     // This will throw NotSupportedException
-    ///     public MyService(IOptionsSnapshot&lt;DatabaseSettings&gt; config) { }
-    /// }
-    /// </code>
-    /// </example>
-    public EnvarSettings BlockOptionsSnapshot()
-    {
-        IsOptionsSnapshotAllowed = false;
-        return this;
-    }
-
-    /// <summary>
-    /// Blocks <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> resolution.
-    /// </summary>
-    /// <returns>A new <see cref="EnvarSettings"/> instance with options monitor disabled.</returns>
-    /// <remarks>
-    /// <para>
-    /// When disabled, <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> resolution
-    /// will throw a <see cref="NotSupportedException"/>.
-    /// </para>
-    /// <para>
-    /// This is useful when you want to ensure that only <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/>
-    /// is used and prevent accidental injection of monitor-based options.
-    /// </para>
-    /// </remarks>
-    /// <example>
-    /// <para>Configuration:</para>
-    /// <code>
-    /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindEnvars(settings =&gt;
-    ///     {
-    ///         settings.BlockOptionsMonitor();
-    ///     });
-    /// </code>
-    /// <para>This will throw when trying to inject IOptionsMonitor&lt;DatabaseSettings&gt;:</para>
-    /// <code>
-    /// public class MyService
-    /// {
-    ///     // This will throw NotSupportedException
-    ///     public MyService(IOptionsMonitor&lt;DatabaseSettings&gt; monitor) { }
-    /// }
-    /// </code>
-    /// </example>
-    public EnvarSettings BlockOptionsMonitor()
-    {
-        IsOptionsMonitorAllowed = false;
-        return this;
-    }
 }

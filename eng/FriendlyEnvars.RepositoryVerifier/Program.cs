@@ -60,6 +60,10 @@ internal static class Program
                     PackageManifestCommand.Run(commandLine);
                     break;
 
+                case "api-removals":
+                    ApiRemovalsCommand.Run(commandLine);
+                    break;
+
                 default:
                     throw new VerificationException(
                         Array.IndexOf(KnownSubcommands, subcommand) >= 0
