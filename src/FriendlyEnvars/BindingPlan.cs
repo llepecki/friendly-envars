@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 
 namespace FriendlyEnvars;
 
@@ -221,11 +222,17 @@ internal sealed class BindingPlan
             object? convertedValue;
 
             // Conversion and assignment are caught separately so the reported failure kind says which of
-            // the two went wrong. Every exception is caught, including EnvarsException raised by a custom
-            // binder, because an unsanitised one would carry the value straight through.
+            // the two went wrong. Every exception is sanitised, including EnvarsException raised by a
+            // custom binder, because an unsanitised one would carry the value straight through. The sole
+            // exception is cancellation, which is the caller's control flow rather than a binding failure
+            // and is propagated as the very same object.
             try
             {
                 convertedValue = binder.Convert(capturedValue, entry.TargetType, culture);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -243,6 +250,18 @@ internal sealed class BindingPlan
             try
             {
                 entry.Property.SetValue(instance, convertedValue);
+            }
+            catch (TargetInvocationException ex) when (ex.InnerException is OperationCanceledException cancellation)
+            {
+                // A setter's exception arrives wrapped by reflection, so cancellation has to be unwrapped
+                // to be propagated unchanged. Rethrowing through ExceptionDispatchInfo keeps both the
+                // original instance and its stack trace.
+                ExceptionDispatchInfo.Capture(cancellation).Throw();
+                throw;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
