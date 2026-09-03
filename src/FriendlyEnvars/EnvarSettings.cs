@@ -36,9 +36,12 @@ public sealed record EnvarSettings
     /// <item><description>Uses <see cref="CultureInfo.InvariantCulture"/> for parsing</description></item>
     /// </list>
     /// </remarks>
-    internal EnvarSettings()
+    /// <param name="defaultBinder">
+    /// The shared stateless binder used unless the caller supplies one of their own.
+    /// </param>
+    internal EnvarSettings(IEnvarPropertyBinder defaultBinder)
     {
-        EnvarPropertyBinder = new DefaultEnvarPropertyBinder();
+        EnvarPropertyBinder = defaultBinder;
         Culture = CultureInfo.InvariantCulture;
     }
 

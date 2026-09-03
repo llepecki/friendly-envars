@@ -9,6 +9,12 @@ namespace FriendlyEnvars;
 public static class OptionsBuilderExtensions
 {
     /// <summary>
+    /// The binder used when the caller does not supply one. It is stateless, so a single instance is
+    /// shared by every registration rather than allocated per call.
+    /// </summary>
+    private static readonly DefaultEnvarPropertyBinder SharedDefaultBinder = new();
+
+    /// <summary>
     /// Configures the options to be bound from environment variables using <see cref="EnvarAttribute"/> decorations.
     /// </summary>
     /// <typeparam name="T">The type of options to bind. Must be a class with a parameterless constructor.</typeparam>
@@ -105,7 +111,7 @@ public static class OptionsBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(optionsBuilder);
 
-        var settings = new EnvarSettings();
+        var settings = new EnvarSettings(SharedDefaultBinder);
         configure?.Invoke(settings);
 
         // Captured now, so that mutating the settings object afterwards cannot influence binding. The
@@ -115,11 +121,19 @@ public static class OptionsBuilderExtensions
         var culture = CultureInfo.ReadOnly((CultureInfo)settings.Culture.Clone());
         string optionsName = optionsBuilder.Name;
 
+        // Rejected before anything is built, and before the service collection is touched.
+        if (FriendlyEnvarsRegistrationMarker.IsRegistered(optionsBuilder.Services, typeof(T), optionsName))
+        {
+            throw new InvalidOperationException(
+                $"FriendlyEnvars is already registered for options type '{typeof(T).FullName}' and " +
+                $"options name '{EnvarsException.FormatOptionsName(optionsName)}'.");
+        }
+
         // Discovery, validation and the environment snapshot all happen here, before the service
         // collection is touched. A failure therefore leaves no partial registration behind.
         var plan = BindingPlan.Build(typeof(T), optionsName, environmentVariableReader, planObserver);
 
-        optionsBuilder.Configure(static _ => { });
+        optionsBuilder.Services.AddSingleton(new FriendlyEnvarsRegistrationMarker(typeof(T), optionsName));
 
         optionsBuilder.Services.AddSingleton<IConfigureOptions<T>>(
             new ConfigureNamedOptions<T>(optionsName, options => plan.Apply(options, binder, culture)));
