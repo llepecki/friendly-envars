@@ -4,17 +4,40 @@
         <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
         <Nullable>enable</Nullable>
     </PropertyGroup>
-    
+
     <ItemGroup>
         <ProjectReference Include="..\..\src\FriendlyEnvars\FriendlyEnvars.csproj" />
     </ItemGroup>
 
     <!-- Package references for .NET 8.0 -->
     <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+        <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
         <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" Version="8.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+        <!--
+          Not used by any code here, and it has no compile or runtime effect: the net8.0 assets for this
+          package are lib/net8.0/_._ and nothing lands in the output directory.
+
+          It exists to make the version auditable. Hosting 8.0.1 brings in
+          Microsoft.Extensions.Configuration.Json 8.0.1, which declares System.Text.Json 8.0.5 for
+          net6.0, net7.0, netstandard2.x and .NET Framework, but declares nothing for net8.0 - there it
+          relies on the shared framework. System.Text.Json is therefore absent from the resolved
+          net8.0 graph entirely - measured, and not a consequence of SDK package pruning: it stays
+          absent with RestoreEnablePackagePruning disabled. With nothing in the graph, the
+          vulnerable-package listing can never observe which version is in play.
+
+          Referencing it directly puts an explicit 8.0.6 in the graph, so eng/audit-dependencies.sh has
+          something to audit and REV-M05's lock file records a definite version. This is a visibility
+          measure, not a fix: the transitive situation was already secure.
+        -->
+        <PackageReference Include="System.Text.Json" Version="8.0.6" NoWarn="NU1510" />
+
+        <!--
+          NU1510 says the reference above is redundant because the shared framework already provides the
+          package. That is true for compilation and beside the point for auditing, so it is suppressed -
+          on this one item, so it cannot mask the same advisory for any reference added later.
+        -->
     </ItemGroup>
 
     <!-- Package references for .NET 10.0 -->
