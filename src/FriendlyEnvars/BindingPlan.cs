@@ -249,9 +249,25 @@ internal sealed class BindingPlan
         }
     }
 
+    /// <summary>
+    /// A bind target must be a non-indexed property with a public instance set or init accessor.
+    /// </summary>
+    /// <remarks>
+    /// Static properties are rejected rather than bound: assigning one would mutate process-wide state
+    /// shared by every options instance, which is never what a per-registration snapshot means. An
+    /// indexer has no single value to assign. A setter that is private, protected or internal is not part
+    /// of the type's configuration surface, so binding through it would defeat the author's intent.
+    /// An init accessor is a setter carrying a modreq, so it satisfies this rule exactly like an ordinary
+    /// one.
+    /// </remarks>
     private static bool IsSupportedBindTarget(PropertyInfo property)
     {
-        return property.CanWrite;
+        if (property.GetIndexParameters().Length != 0)
+        {
+            return false;
+        }
+
+        return property.SetMethod is { IsPublic: true, IsStatic: false };
     }
 
     /// <summary>
