@@ -33,8 +33,11 @@ public class PropertyAccessibilityTests : EnvarTestsBase
         var serviceProvider = services.BuildServiceProvider();
         var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<InvalidPropertyOptions>>().Value);
 
+        Assert.Equal(EnvarFailureKind.InvalidProperty, exception.FailureKind);
+        Assert.Equal("ReadOnlyProperty", exception.PropertyName);
+        Assert.Equal("READONLY_PROPERTY", exception.EnvironmentVariableName);
         Assert.Contains("ReadOnlyProperty", exception.Message);
-        Assert.Contains("setter", exception.Message);
+        Assert.Contains("is not a supported bind target", exception.Message);
     }
 
     [Fact]

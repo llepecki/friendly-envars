@@ -96,39 +96,70 @@ public static class OptionsBuilderExtensions
 
         optionsBuilder.Configure(static _ => { });
 
+        string optionsName = optionsBuilder.Name;
+
         optionsBuilder.Services.AddSingleton<IConfigureOptions<T>>(
-            new ConfigureNamedOptions<T>(optionsBuilder.Name, options => Bind(options, settings.EnvarPropertyBinder, settings.Culture)));
+            new ConfigureNamedOptions<T>(optionsName, options => Bind(options, optionsName, settings.EnvarPropertyBinder, settings.Culture)));
 
         return optionsBuilder;
     }
 
     [StackTraceHidden]
-    private static void Bind<T>(T instance, IEnvarPropertyBinder binder, CultureInfo culture)
+    private static void Bind<T>(T instance, string optionsName, IEnvarPropertyBinder binder, CultureInfo culture)
     {
-        var type = typeof(T);
+        var optionsType = typeof(T);
 
-        foreach (var metadata in EnvarPropertyCache.GetOrAdd(type, GetEnvarProperties))
+        foreach (var metadata in EnvarPropertyCache.GetOrAdd(optionsType, GetEnvarProperties))
         {
-            var value = Environment.GetEnvironmentVariable(metadata.Attribute.Name);
+            var property = metadata.Property;
+            var targetType = property.PropertyType;
+            string environmentVariableName = metadata.Attribute.Name;
+
+            string? value;
+
+            try
+            {
+                value = Environment.GetEnvironmentVariable(environmentVariableName);
+            }
+            catch (Exception ex)
+            {
+                throw EnvarsException.EnvironmentReadFailure(
+                    environmentVariableName, optionsType, optionsName, property.Name, targetType, EnvarsException.DescribeCause(ex));
+            }
 
             if (value is null)
             {
                 continue;
             }
 
-            if (!metadata.Property.CanWrite)
+            if (!property.CanWrite)
             {
-                throw new EnvarsException($"Property '{metadata.Property.Name}' with the {nameof(EnvarAttribute)} does not have an accessible setter");
+                throw EnvarsException.InvalidPropertyShape(environmentVariableName, optionsType, optionsName, property.Name, targetType);
+            }
+
+            object? convertedValue;
+
+            // Conversion and assignment are caught separately so the reported failure kind says which of
+            // the two went wrong. Every exception is caught, including EnvarsException raised by a custom
+            // binder, because an unsanitised one would carry the value straight through.
+            try
+            {
+                convertedValue = binder.Convert(value, targetType, culture);
+            }
+            catch (Exception ex)
+            {
+                throw EnvarsException.ConversionFailure(
+                    environmentVariableName, optionsType, optionsName, property.Name, targetType, culture.Name, binder.GetType(), EnvarsException.DescribeCause(ex));
             }
 
             try
             {
-                var convertedValue = binder.Convert(value, metadata.Property.PropertyType, culture);
-                metadata.Property.SetValue(instance, convertedValue);
+                property.SetValue(instance, convertedValue);
             }
-            catch (Exception ex) when (ex is not EnvarsException)
+            catch (Exception ex)
             {
-                throw new EnvarsException($"Failed to convert environment variable '{metadata.Attribute.Name}' with value '{value}' to type '{metadata.Property.PropertyType.Name}' for property '{metadata.Property.Name}'", ex);
+                throw EnvarsException.AssignmentFailure(
+                    environmentVariableName, optionsType, optionsName, property.Name, targetType, EnvarsException.DescribeCause(ex));
             }
         }
     }

@@ -96,9 +96,11 @@ public class TypeConversionTests : EnvarTestsBase
         var serviceProvider = services.BuildServiceProvider();
         var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<TypeOptions>>().Value);
 
+        Assert.Equal(EnvarFailureKind.Conversion, exception.FailureKind);
         Assert.Contains("TYPES_BOOL", exception.Message);
-        Assert.Contains("not-a-bool", exception.Message);
-        Assert.Contains("Boolean", exception.Message);
+        Assert.Contains("System.Boolean", exception.Message);
+        Assert.DoesNotContain("not-a-bool", exception.Message);
+        Assert.DoesNotContain("not-a-bool", exception.ToString());
     }
 
     [Fact]
@@ -114,9 +116,11 @@ public class TypeConversionTests : EnvarTestsBase
         var serviceProvider = services.BuildServiceProvider();
         var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<TypeOptions>>().Value);
 
+        Assert.Equal(EnvarFailureKind.Conversion, exception.FailureKind);
         Assert.Contains("TYPES_ENUM", exception.Message);
-        Assert.Contains("Four", exception.Message);
         Assert.Contains("TestEnum", exception.Message);
+        Assert.DoesNotContain("Four", exception.Message);
+        Assert.DoesNotContain("Four", exception.ToString());
     }
 
     [Fact]
@@ -132,8 +136,10 @@ public class TypeConversionTests : EnvarTestsBase
         var serviceProvider = services.BuildServiceProvider();
         var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<TypeOptions>>().Value);
 
+        Assert.Equal(EnvarFailureKind.Conversion, exception.FailureKind);
         Assert.Contains("TYPES_CHAR", exception.Message);
-        Assert.Contains("TooLong", exception.Message);
-        Assert.Contains("Char", exception.Message);
+        Assert.Contains("System.Char", exception.Message);
+        Assert.DoesNotContain("TooLong", exception.Message);
+        Assert.DoesNotContain("TooLong", exception.ToString());
     }
 }

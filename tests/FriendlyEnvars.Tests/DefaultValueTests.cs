@@ -65,8 +65,9 @@ public class DefaultValueTests : EnvarTestsBase
         var serviceProvider = services.BuildServiceProvider();
         var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<DefaultValueOptions>>().Value);
 
+        Assert.Equal(EnvarFailureKind.Conversion, exception.FailureKind);
         Assert.Contains("DEFAULT_INT", exception.Message);
-        Assert.Contains("Int32", exception.Message);
+        Assert.Contains("System.Int32", exception.Message);
     }
 
     [Fact]
