@@ -12,6 +12,9 @@
     <Folder Name="/eng/">
         <Project Path="eng/FriendlyEnvars.RepositoryVerifier/FriendlyEnvars.RepositoryVerifier.csproj" />
     </Folder>
+    <Folder Name="/sample/">
+        <Project Path="sample/FriendlyEnvars.Sample/FriendlyEnvars.Sample.csproj" />
+    </Folder>
     <Folder Name="/src/">
         <Project Path="src/FriendlyEnvars/FriendlyEnvars.csproj" />
     </Folder>

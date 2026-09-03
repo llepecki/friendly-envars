@@ -60,6 +60,9 @@ jobs:
       - name: Test (net10.0)
         run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework net10.0 --logger trx --results-directory TestResults
 
+      - name: Run sample
+        run: eng/run-sample.sh
+
       - name: Publish Test Results
         uses: dorny/test-reporter@v1
         if: always()
