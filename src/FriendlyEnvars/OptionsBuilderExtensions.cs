@@ -33,6 +33,14 @@ public static class OptionsBuilderExtensions
     /// is not set, the property retains its default value. Empty values are passed to the binder.
     /// </para>
     /// <para>
+    /// This registers an ordinary <see cref="IConfigureOptions{TOptions}"/>, so it composes with other
+    /// options sources by the normal rule: whichever registration runs last wins. Configuration
+    /// registered before this call is overwritten by a captured environment value; configuration
+    /// registered afterwards overwrites the bound value. Environment values are not forced to take
+    /// priority, and no <see cref="IPostConfigureOptions{TOptions}"/> step is registered. A variable that
+    /// is not set is skipped, so it never clears a value an earlier registration established.
+    /// </para>
+    /// <para>
     /// <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/>,
     /// <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/>,
     /// <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> and

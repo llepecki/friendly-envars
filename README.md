@@ -200,6 +200,49 @@ services.AddOptions<DatabaseSettings>()
 > from several threads at once puts several threads inside `Convert` simultaneously. Keep it stateless,
 > or guard whatever state it holds. The library never copies, resets or locks around a binder.
 
+#### Configuration Precedence
+
+`BindEnvars()` registers an ordinary `IConfigureOptions<T>`, so it composes with every other options
+source by the normal rule: **whichever registration runs last wins.** FriendlyEnvars does not force
+environment values to take priority, and does not register a `PostConfigure` step.
+
+`Configure` assigns to a property after the instance is constructed, so the properties it writes need a
+`set` accessor rather than `init`:
+
+```csharp
+public class ServerSettings
+{
+    [Envar("SERVER_HOST")]
+    public string Host { get; set; } = "localhost";
+}
+```
+
+The environment value wins here, because `BindEnvars()` is registered last:
+
+```csharp
+var services = new ServiceCollection();
+
+services.AddOptions<ServerSettings>()
+    .Configure(options => options.Host = "from-code")
+    .BindEnvars();
+```
+
+The code value wins here, because `Configure` is registered last:
+
+```csharp
+var services = new ServiceCollection();
+
+services.AddOptions<ServerSettings>()
+    .BindEnvars()
+    .Configure(options => options.Host = "from-code");
+```
+
+Each block is a separate registration. Calling `BindEnvars()` twice for the same options type and name
+in one container is rejected, so the two examples cannot be combined into one.
+
+A variable that is not set is skipped rather than bound as null, so it never clears a value that an
+earlier `Configure` established.
+
 #### Working with `IOptionsSnapshot` and `IOptionsMonitor`
 
 `IOptions<T>`, `IOptionsSnapshot<T>`, `IOptionsMonitor<T>` and `IOptionsFactory<T>` all resolve normally.
