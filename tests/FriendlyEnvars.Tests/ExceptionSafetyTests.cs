@@ -100,6 +100,17 @@ public class ExceptionSafetyTests : EnvarTestsBase
         }
     }
 
+    /// <summary>
+    /// Captures a failure raised while the options type is registered, before any service is resolved.
+    /// </summary>
+    private static EnvarsException RegisterAndCaptureFailure<T>(string optionsName = "")
+        where T : class, new()
+    {
+        var services = new ServiceCollection();
+
+        return Assert.Throws<EnvarsException>(() => services.AddOptions<T>(optionsName).BindEnvars());
+    }
+
     private static EnvarsException BindAndCaptureFailure<T>(Action<EnvarSettings>? configure = null, string optionsName = "")
         where T : class, new()
     {
@@ -243,11 +254,14 @@ public class ExceptionSafetyTests : EnvarTestsBase
     {
         SetEnvironmentVariable("H01_READONLY", Sentinel);
 
-        var exception = BindAndCaptureFailure<ReadOnlyOptions>();
+        // An unsupported shape is rejected while the options type is registered, before the environment
+        // is read, so the failure never reaches options creation.
+        var exception = RegisterAndCaptureFailure<ReadOnlyOptions>();
 
         AssertNoValueDisclosure(exception);
 
         Assert.Equal(EnvarFailureKind.InvalidProperty, exception.FailureKind);
+        Assert.Equal(Options.DefaultName, exception.OptionsName);
         Assert.Equal("H01_READONLY", exception.EnvironmentVariableName);
         Assert.Equal(typeof(ReadOnlyOptions), exception.OptionsType);
         Assert.Equal(nameof(ReadOnlyOptions.Value), exception.PropertyName);

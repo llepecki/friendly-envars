@@ -1,18 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
-using System.Reflection;
+using System.Diagnostics.CodeAnalysis;
 
 namespace FriendlyEnvars;
 
 public static class OptionsBuilderExtensions
 {
-    private static readonly ConcurrentDictionary<Type, EnvarPropertyMetadata[]> EnvarPropertyCache = new();
-
     /// <summary>
     /// Configures the options to be bound from environment variables using <see cref="EnvarAttribute"/> decorations.
     /// </summary>
@@ -87,101 +81,46 @@ public static class OptionsBuilderExtensions
     /// DB_SSL_ENABLED=false
     /// </code>
     /// </example>
-    public static OptionsBuilder<T> BindEnvars<T>(this OptionsBuilder<T> optionsBuilder, Action<EnvarSettings>? configure = null) where T : class, new()
+    public static OptionsBuilder<T> BindEnvars<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>(
+        this OptionsBuilder<T> optionsBuilder,
+        Action<EnvarSettings>? configure = null) where T : class, new()
+    {
+        return BindEnvarsCore(optionsBuilder, configure, ProcessEnvironmentVariableReader.Instance, NullBindingPlanObserver.Instance);
+    }
+
+    /// <summary>
+    /// The single implementation of <see cref="BindEnvars{T}"/>, parameterised by the environment reader
+    /// and the plan observer so that tests can count reads and metadata inspections.
+    /// </summary>
+    /// <remarks>
+    /// Neither seam is exposed publicly, and neither is captured by the registered configurator: the
+    /// configurator closes over the completed plan only.
+    /// </remarks>
+    internal static OptionsBuilder<T> BindEnvarsCore<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>(
+        OptionsBuilder<T> optionsBuilder,
+        Action<EnvarSettings>? configure,
+        IEnvironmentVariableReader environmentVariableReader,
+        IBindingPlanObserver planObserver) where T : class, new()
     {
         ArgumentNullException.ThrowIfNull(optionsBuilder);
 
         var settings = new EnvarSettings();
         configure?.Invoke(settings);
 
-        optionsBuilder.Configure(static _ => { });
-
+        // Captured now, so that mutating the settings object afterwards cannot influence binding.
+        var binder = settings.EnvarPropertyBinder;
+        var culture = settings.Culture;
         string optionsName = optionsBuilder.Name;
 
+        // Discovery, validation and the environment snapshot all happen here, before the service
+        // collection is touched. A failure therefore leaves no partial registration behind.
+        var plan = BindingPlan.Build(typeof(T), optionsName, environmentVariableReader, planObserver);
+
+        optionsBuilder.Configure(static _ => { });
+
         optionsBuilder.Services.AddSingleton<IConfigureOptions<T>>(
-            new ConfigureNamedOptions<T>(optionsName, options => Bind(options, optionsName, settings.EnvarPropertyBinder, settings.Culture)));
+            new ConfigureNamedOptions<T>(optionsName, options => plan.Apply(options, binder, culture)));
 
         return optionsBuilder;
     }
-
-    [StackTraceHidden]
-    private static void Bind<T>(T instance, string optionsName, IEnvarPropertyBinder binder, CultureInfo culture)
-    {
-        var optionsType = typeof(T);
-
-        foreach (var metadata in EnvarPropertyCache.GetOrAdd(optionsType, GetEnvarProperties))
-        {
-            var property = metadata.Property;
-            var targetType = property.PropertyType;
-            string environmentVariableName = metadata.Attribute.Name;
-
-            string? value;
-
-            try
-            {
-                value = Environment.GetEnvironmentVariable(environmentVariableName);
-            }
-            catch (Exception ex)
-            {
-                throw EnvarsException.EnvironmentReadFailure(
-                    environmentVariableName, optionsType, optionsName, property.Name, targetType, EnvarsException.DescribeCause(ex));
-            }
-
-            if (value is null)
-            {
-                continue;
-            }
-
-            if (!property.CanWrite)
-            {
-                throw EnvarsException.InvalidPropertyShape(environmentVariableName, optionsType, optionsName, property.Name, targetType);
-            }
-
-            object? convertedValue;
-
-            // Conversion and assignment are caught separately so the reported failure kind says which of
-            // the two went wrong. Every exception is caught, including EnvarsException raised by a custom
-            // binder, because an unsanitised one would carry the value straight through.
-            try
-            {
-                convertedValue = binder.Convert(value, targetType, culture);
-            }
-            catch (Exception ex)
-            {
-                throw EnvarsException.ConversionFailure(
-                    environmentVariableName, optionsType, optionsName, property.Name, targetType, culture.Name, binder.GetType(), EnvarsException.DescribeCause(ex));
-            }
-
-            try
-            {
-                property.SetValue(instance, convertedValue);
-            }
-            catch (Exception ex)
-            {
-                throw EnvarsException.AssignmentFailure(
-                    environmentVariableName, optionsType, optionsName, property.Name, targetType, EnvarsException.DescribeCause(ex));
-            }
-        }
-    }
-
-    private static EnvarPropertyMetadata[] GetEnvarProperties(Type type)
-    {
-        var properties = type.GetProperties();
-        var metadata = new List<EnvarPropertyMetadata>(properties.Length);
-
-        foreach (var property in properties)
-        {
-            var envarAttribute = property.GetCustomAttribute<EnvarAttribute>();
-            if (envarAttribute is null)
-            {
-                continue;
-            }
-
-            metadata.Add(new EnvarPropertyMetadata(property, envarAttribute));
-        }
-
-        return metadata.ToArray();
-    }
-
-    private readonly record struct EnvarPropertyMetadata(PropertyInfo Property, EnvarAttribute Attribute);
 }

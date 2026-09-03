@@ -170,6 +170,49 @@ public sealed class EnvarsException : Exception
             causeType: null);
     }
 
+    internal static EnvarsException TypeDiscoveryFailure(Type optionsType, string optionsName, string causeType)
+    {
+        string message =
+            $"Failed to inspect environment-variable bindings for options type '{optionsType.FullName}' " +
+            $"(options name '{FormatOptionsName(optionsName)}').";
+
+        return new EnvarsException(
+            message,
+            EnvarFailureKind.InvalidProperty,
+            environmentVariableName: null,
+            optionsType,
+            optionsName,
+            propertyName: null,
+            targetType: null,
+            cultureName: null,
+            binderType: null,
+            causeType);
+    }
+
+    internal static EnvarsException PropertyMetadataFailure(
+        Type optionsType,
+        string optionsName,
+        string propertyName,
+        Type? targetType,
+        string causeType)
+    {
+        string message =
+            $"Failed to inspect environment-variable binding metadata for property " +
+            $"'{optionsType.FullName}.{propertyName}' (options name '{FormatOptionsName(optionsName)}').";
+
+        return new EnvarsException(
+            message,
+            EnvarFailureKind.InvalidProperty,
+            environmentVariableName: null,
+            optionsType,
+            optionsName,
+            propertyName,
+            targetType,
+            cultureName: null,
+            binderType: null,
+            causeType);
+    }
+
     internal static EnvarsException EnvironmentReadFailure(
         string environmentVariableName,
         Type optionsType,

@@ -27,11 +27,9 @@ public class PropertyAccessibilityTests : EnvarTestsBase
         SetEnvironmentVariable("READONLY_PROPERTY", "Value");
 
         var services = new ServiceCollection();
-        services.AddOptions<InvalidPropertyOptions>()
-            .BindEnvars();
 
-        var serviceProvider = services.BuildServiceProvider();
-        var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<InvalidPropertyOptions>>().Value);
+        // The property shape is validated while BindEnvars runs, not lazily at options creation.
+        var exception = Assert.Throws<EnvarsException>(() => services.AddOptions<InvalidPropertyOptions>().BindEnvars());
 
         Assert.Equal(EnvarFailureKind.InvalidProperty, exception.FailureKind);
         Assert.Equal("ReadOnlyProperty", exception.PropertyName);
