@@ -170,6 +170,29 @@ public sealed class EnvarsException : Exception
             causeType: null);
     }
 
+    internal static EnvarsException InvalidAttributeName(
+        Type optionsType,
+        string optionsName,
+        string propertyName,
+        Type targetType)
+    {
+        // The offending name is deliberately absent from both the message and the metadata: it came from
+        // source, but reproducing malformed text here would let a corrupted name forge message structure.
+        string message = $"Property '{optionsType.FullName}.{propertyName}' has an invalid environment-variable name.";
+
+        return new EnvarsException(
+            message,
+            EnvarFailureKind.InvalidProperty,
+            environmentVariableName: null,
+            optionsType,
+            optionsName,
+            propertyName,
+            targetType,
+            cultureName: null,
+            binderType: null,
+            causeType: null);
+    }
+
     internal static EnvarsException TypeDiscoveryFailure(Type optionsType, string optionsName, string causeType)
     {
         string message =

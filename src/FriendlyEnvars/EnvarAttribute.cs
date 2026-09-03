@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace FriendlyEnvars;
 
@@ -51,7 +52,10 @@ public sealed class EnvarAttribute : Attribute
     /// Initializes a new instance of the <see cref="EnvarAttribute"/> class.
     /// </summary>
     /// <param name="name">The name of the environment variable to bind from.</param>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is null or empty.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="name"/> is null, empty, whitespace only, contains <c>=</c>, or
+    /// contains a Unicode control character.
+    /// </exception>
     /// <example>
     /// <para>Binds the Port property to the DB_PORT environment variable:</para>
     /// <code>
@@ -66,11 +70,49 @@ public sealed class EnvarAttribute : Attribute
     /// </example>
     public EnvarAttribute(string name)
     {
-        if (string.IsNullOrEmpty(name))
+        if (!IsValidName(name))
         {
-            throw new ArgumentException("Name can't be null or empty", nameof(name));
+            throw new ArgumentException(
+                "An environment-variable name must not be null, empty or whitespace only, and must not contain '=' or a Unicode control character.",
+                nameof(name));
         }
 
         Name = name;
+    }
+
+    /// <summary>
+    /// The single definition of what counts as a usable environment-variable name.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Shared by this constructor and by binding, which reads the name out of metadata without
+    /// constructing the attribute. Both paths therefore agree by construction.
+    /// </para>
+    /// <para>
+    /// The rule is deliberately permissive about content and strict only about what no platform can
+    /// carry: <c>=</c> separates a name from its value in every environment block, and a control
+    /// character cannot survive a round trip through one. Everything else is preserved, including
+    /// ordinary embedded spaces and non-ASCII letters, because operating systems differ on what they
+    /// accept and the library should not invent a stricter portable subset than the contract states.
+    /// </para>
+    /// </remarks>
+    internal static bool IsValidName([NotNullWhen(true)] string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < name.Length; i++)
+        {
+            char character = name[i];
+
+            if (character == '=' || char.IsControl(character))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

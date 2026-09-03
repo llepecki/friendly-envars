@@ -129,11 +129,11 @@ internal sealed class BindingPlan
 
         foreach (var property in properties)
         {
-            EnvarAttribute? attribute;
+            CustomAttributeData? attributeData;
 
             try
             {
-                attribute = property.GetCustomAttribute<EnvarAttribute>(inherit: true);
+                attributeData = FindEnvarAttributeData(property);
             }
             catch (Exception ex)
             {
@@ -141,7 +141,7 @@ internal sealed class BindingPlan
                     optionsType, optionsName, property.Name, SafePropertyType(property), EnvarsException.DescribeCause(ex));
             }
 
-            if (attribute is null)
+            if (attributeData is null)
             {
                 continue;
             }
@@ -149,13 +149,21 @@ internal sealed class BindingPlan
             planObserver.MetadataInspected(property);
 
             var targetType = property.PropertyType;
+            string? environmentVariableName = DecodeEnvironmentVariableName(attributeData);
+
+            // The name is validated first, so that the unsupported-shape failure below can carry a name
+            // that is known to be usable rather than echoing malformed metadata.
+            if (!EnvarAttribute.IsValidName(environmentVariableName))
+            {
+                throw EnvarsException.InvalidAttributeName(optionsType, optionsName, property.Name, targetType);
+            }
 
             if (!IsSupportedBindTarget(property))
             {
-                throw EnvarsException.InvalidPropertyShape(attribute.Name, optionsType, optionsName, property.Name, targetType);
+                throw EnvarsException.InvalidPropertyShape(environmentVariableName, optionsType, optionsName, property.Name, targetType);
             }
 
-            descriptors.Add(new PropertyDescriptor(property, attribute.Name, targetType));
+            descriptors.Add(new PropertyDescriptor(property, environmentVariableName, targetType));
         }
 
         var entries = new BindingPlanEntry[descriptors.Count];
@@ -247,6 +255,102 @@ internal sealed class BindingPlan
                     EnvarsException.DescribeCause(ex));
             }
         }
+    }
+
+    /// <summary>
+    /// Finds the <see cref="EnvarAttribute"/> on a property without constructing it.
+    /// </summary>
+    /// <remarks>
+    /// Reading the attribute through <see cref="CustomAttributeData"/> means a malformed name reaches the
+    /// binder as data to be reported, instead of blowing up inside the attribute constructor with an
+    /// exception that says nothing about which property is at fault.
+    /// <para>
+    /// <see cref="MemberInfo.GetCustomAttributesData"/> does not walk the inheritance chain, so an
+    /// override of a decorated virtual property is followed explicitly. Without this, decorating a base
+    /// property and overriding it in a derived type would silently stop binding.
+    /// </para>
+    /// </remarks>
+    private static CustomAttributeData? FindEnvarAttributeData(PropertyInfo property)
+    {
+        var current = property;
+
+        while (current is not null)
+        {
+            foreach (var data in current.GetCustomAttributesData())
+            {
+                if (data.AttributeType == typeof(EnvarAttribute))
+                {
+                    return data;
+                }
+            }
+
+            current = GetOverriddenProperty(current);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the property this one overrides, one level up, or null when there is none.
+    /// </summary>
+    /// <remarks>
+    /// The base chain is walked a level at a time rather than jumping to
+    /// <see cref="MethodInfo.GetBaseDefinition"/>'s declaring type, because that returns the ROOT
+    /// declaration and would skip every intermediate one. An attribute declared on a middle override
+    /// would then be lost silently, which for a configuration library means the property quietly stops
+    /// binding instead of failing.
+    /// <para>
+    /// The exact-signature lookup also disambiguates overloaded indexers, which the name-only overload
+    /// rejects with <see cref="AmbiguousMatchException"/>.
+    /// </para>
+    /// </remarks>
+    private static PropertyInfo? GetOverriddenProperty(PropertyInfo property)
+    {
+        var accessor = property.GetMethod ?? property.SetMethod;
+
+        if (accessor is null || !accessor.IsVirtual || accessor.GetBaseDefinition() == accessor)
+        {
+            return null;
+        }
+
+        var indexParameterTypes = Array.ConvertAll(property.GetIndexParameters(), static parameter => parameter.ParameterType);
+        var baseType = property.DeclaringType?.BaseType;
+
+        while (baseType is not null)
+        {
+            var candidate = baseType.GetProperty(
+                property.Name,
+                BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly,
+                binder: null,
+                property.PropertyType,
+                indexParameterTypes,
+                modifiers: null);
+
+            if (candidate is not null)
+            {
+                return candidate;
+            }
+
+            baseType = baseType.BaseType;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Decodes the attribute's single string constructor argument, or returns null when the metadata is
+    /// not the shape this library wrote.
+    /// </summary>
+    private static string? DecodeEnvironmentVariableName(CustomAttributeData attributeData)
+    {
+        var arguments = attributeData.ConstructorArguments;
+
+        if (arguments.Count != 1 || arguments[0].ArgumentType != typeof(string))
+        {
+            return null;
+        }
+
+        return arguments[0].Value as string;
     }
 
     /// <summary>
