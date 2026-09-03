@@ -216,6 +216,56 @@ Exceptions thrown by a binder are sanitised — only the exception's type name s
 — so a failure cannot leak the value. The one exception is `OperationCanceledException`, which is
 propagated unchanged as your own control flow; do not put a value in a cancellation message.
 
+#### Named Options
+
+The same options type can be registered under several names. **Each `BindEnvars()` call takes its own
+snapshot of the environment**, so two names can hold different values, and neither changes afterwards:
+
+```csharp
+public class RegionSettings
+{
+    [Envar("REGION_ENDPOINT")]
+    public string Endpoint { get; init; } = string.Empty;
+}
+```
+
+```csharp
+var services = new ServiceCollection();
+
+Environment.SetEnvironmentVariable("REGION_ENDPOINT", "https://eu.example.com");
+services.AddOptions<RegionSettings>("eu").BindEnvars();
+
+Environment.SetEnvironmentVariable("REGION_ENDPOINT", "https://us.example.com");
+services.AddOptions<RegionSettings>("us").BindEnvars();
+
+using var provider = services.BuildServiceProvider();
+```
+
+Read them back the ordinary way — nothing about FriendlyEnvars changes how named options are accessed:
+
+```csharp
+var factory = provider.GetRequiredService<IOptionsFactory<RegionSettings>>();
+Console.WriteLine(factory.Create("eu").Endpoint);   // https://eu.example.com
+
+var monitor = provider.GetRequiredService<IOptionsMonitor<RegionSettings>>();
+Console.WriteLine(monitor.Get("us").Endpoint);      // https://us.example.com
+
+using var scope = provider.CreateScope();
+var snapshot = scope.ServiceProvider.GetRequiredService<IOptionsSnapshot<RegionSettings>>();
+Console.WriteLine(snapshot.Get("eu").Endpoint);     // https://eu.example.com
+```
+
+Three rules worth knowing:
+
+- **Capture time is per registration.** A name holds whatever the environment said when *its own*
+  `BindEnvars()` ran, not what it says later.
+- **The same name cannot be registered twice.** A second `BindEnvars()` for the same options type and
+  name throws `InvalidOperationException`, because the two snapshots would otherwise silently overwrite
+  one another in registration order. Different names, and different types, are unaffected.
+- **Precedence is per name.** The last registration for a given name wins, exactly as described below.
+
+A name that was never registered simply gets the type's own defaults.
+
 #### Configuration Precedence
 
 `BindEnvars()` registers an ordinary `IConfigureOptions<T>`, so it composes with every other options

@@ -45,6 +45,21 @@ builder.Services
     .AddOptions<FeatureFlags>()
     .BindEnvars();
 
+// Two named registrations of one options type. Each BindEnvars call takes its own snapshot, so the two
+// names hold whatever the environment said at the moment each was registered - changing the variable
+// between the calls gives them different values, and nothing changes either of them afterwards.
+Environment.SetEnvironmentVariable("SAMPLE_REGION_ENDPOINT", "https://eu.example.com");
+
+builder.Services
+    .AddOptions<RegionSettings>("eu")
+    .BindEnvars();
+
+Environment.SetEnvironmentVariable("SAMPLE_REGION_ENDPOINT", "https://us.example.com");
+
+builder.Services
+    .AddOptions<RegionSettings>("us")
+    .BindEnvars();
+
 builder.Services.AddSingleton<ConfigurationReporter>();
 
 using var host = builder.Build();
@@ -187,6 +202,13 @@ public class ApiSettings
     public string? SupportEmail { get; init; }
 }
 
+/// <summary>Bound twice under two names, to show that each registration keeps its own snapshot.</summary>
+public class RegionSettings
+{
+    [Envar("SAMPLE_REGION_ENDPOINT")]
+    public string Endpoint { get; init; } = string.Empty;
+}
+
 public class FeatureFlags
 {
     [Envar("SAMPLE_FEATURE_LOGGING")]
@@ -232,15 +254,24 @@ public sealed class ConfigurationReporter
     private readonly DatabaseSettings _database;
     private readonly ApiSettings _api;
     private readonly FeatureFlags _features;
+    private readonly IOptionsFactory<RegionSettings> _regionFactory;
+    private readonly IOptionsMonitor<RegionSettings> _regionMonitor;
+    private readonly IServiceScopeFactory _scopeFactory;
 
     public ConfigurationReporter(
         IOptions<DatabaseSettings> database,
         IOptions<ApiSettings> api,
-        IOptions<FeatureFlags> features)
+        IOptions<FeatureFlags> features,
+        IOptionsFactory<RegionSettings> regionFactory,
+        IOptionsMonitor<RegionSettings> regionMonitor,
+        IServiceScopeFactory scopeFactory)
     {
         _database = database.Value;
         _api = api.Value;
         _features = features.Value;
+        _regionFactory = regionFactory;
+        _regionMonitor = regionMonitor;
+        _scopeFactory = scopeFactory;
     }
 
     public void Report()
@@ -258,6 +289,18 @@ public sealed class ConfigurationReporter
         Console.WriteLine($"Logging enabled   : {_features.LoggingEnabled}");
         Console.WriteLine($"Caching enabled   : {_features.CachingEnabled}");
         Console.WriteLine($"Metrics enabled   : {_features.MetricsEnabled}");
+
+        // Named options are reached the ordinary way: Create on the factory, Get on the monitor, and
+        // Get on a scoped snapshot. Nothing about FriendlyEnvars changes how any of them behave.
+        using var scope = _scopeFactory.CreateScope();
+        var snapshot = scope.ServiceProvider.GetRequiredService<IOptionsSnapshot<RegionSettings>>();
+
+        foreach (string name in new[] { "eu", "us" })
+        {
+            Console.WriteLine(
+                $"Region '{name}'      : factory={_regionFactory.Create(name).Endpoint} " +
+                $"monitor={_regionMonitor.Get(name).Endpoint} snapshot={snapshot.Get(name).Endpoint}");
+        }
     }
 
     /// <summary>
