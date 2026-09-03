@@ -150,6 +150,31 @@ public class EnvarSettingsTests : EnvarTestsBase
     }
 
     [Fact]
+    public void MutatingASuppliedNeutralCultureAfterRegistration_CannotAlterParsing()
+    {
+        SetEnvironmentVariable("M03_NUMBER", "1.5");
+
+        // CultureInfo.ReadOnly only freezes NumberFormat and DateTimeFormat when the culture is NOT
+        // neutral, so freezing a neutral culture without cloning it first would leave the caller's
+        // mutable NumberFormatInfo shared with the registration. This pins the Clone().
+        var culture = new CultureInfo("en");
+        _ = culture.NumberFormat;
+
+        var services = new ServiceCollection();
+        services.AddOptions<NumericOptions>().BindEnvars(settings => settings.UseCulture(culture));
+
+        using var provider = services.BuildServiceProvider();
+        var factory = provider.GetRequiredService<IOptionsFactory<NumericOptions>>();
+
+        Assert.Equal(1.5d, factory.Create(Options.DefaultName).Number);
+
+        culture.NumberFormat.NumberDecimalSeparator = ",";
+        culture.NumberFormat.NumberGroupSeparator = ".";
+
+        Assert.Equal(1.5d, factory.Create(Options.DefaultName).Number);
+    }
+
+    [Fact]
     public void RetainingAndReconfiguringTheSettingsObjectAfterRegistration_CannotAlterParsing()
     {
         SetEnvironmentVariable("M03_NUMBER", "1.5");

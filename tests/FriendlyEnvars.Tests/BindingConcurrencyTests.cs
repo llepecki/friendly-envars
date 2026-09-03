@@ -21,6 +21,11 @@ namespace FriendlyEnvars.Tests;
 /// </remarks>
 public class BindingConcurrencyTests : EnvarTestsBase
 {
+    // The barrier tests deliberately cover IOptionsFactory and IOptionsSnapshot but NOT
+    // IOptionsMonitor. Microsoft's singleton IOptionsMonitorCache<T> serialises creation through an
+    // ExecutionAndPublication Lazy<T>, so a barrier across concurrent monitor reads could never release.
+    // That is a property of Microsoft.Extensions.Options, not of this library; extending these tests to
+    // the monitor would produce a false 30-second failure.
     private const int Participants = 32;
 
     private static readonly TimeSpan BarrierTimeout = TimeSpan.FromSeconds(30);

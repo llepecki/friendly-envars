@@ -52,9 +52,29 @@ public sealed record EnvarSettings
     /// <returns>The same <see cref="EnvarSettings"/> instance, so calls can be chained.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="binder"/> is null.</exception>
     /// <remarks>
-    /// The reference is captured when <c>BindEnvars</c> returns, and the one instance is reused for every
-    /// options instance this registration produces. Whatever state the binder holds internally is the
-    /// caller's responsibility: the library never copies, resets or synchronises it.
+    /// <para>
+    /// The reference is captured while <c>BindEnvars</c> runs, immediately after the configuration
+    /// delegate returns, and the one instance is reused for every options instance this registration
+    /// produces. Whatever state the binder holds internally is the caller's responsibility: the library
+    /// never copies, resets or synchronises it.
+    /// </para>
+    /// <para>
+    /// <b>A binder is trusted code that receives secrets.</b> It is handed the complete environment
+    /// value verbatim, which routinely means a password, connection string or API key. The library does
+    /// not sandbox, redact or inspect it. An implementation must:
+    /// </para>
+    /// <list type="bullet">
+    /// <item><description>be deterministic - the same input must always produce an equivalent result;</description></item>
+    /// <item><description>be thread-safe, because one instance is shared by every options instance a
+    /// registration produces and the library calls it concurrently without serialising;</description></item>
+    /// <item><description>never log, print, cache or otherwise retain the value it is given, in memory or
+    /// anywhere else.</description></item>
+    /// </list>
+    /// <para>
+    /// Exceptions thrown by a binder are sanitised: only the exception's type name survives, never its
+    /// message. The one exception is <see cref="OperationCanceledException"/>, which is propagated
+    /// unchanged as the caller's own control flow, so a cancellation message must not carry a value.
+    /// </para>
     /// </remarks>
     /// <example>
     /// <para>Custom binder class:</para>

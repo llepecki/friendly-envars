@@ -104,6 +104,10 @@ public class CancellationTests : EnvarTestsBase
             // Unwrapped from the reflection wrapper, and the same object the setter threw.
             Assert.Same(cancellation, thrown);
             Assert.IsNotType<System.Reflection.TargetInvocationException>(thrown);
+
+            // Rethrown through ExceptionDispatchInfo rather than `throw cancellation`, which would erase
+            // the setter's frame and make the cancellation harder to trace back to its origin.
+            Assert.Contains("set_Value", thrown.StackTrace!, StringComparison.Ordinal);
         }
         finally
         {

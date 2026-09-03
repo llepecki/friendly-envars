@@ -74,6 +74,23 @@ public interface IEnvarPropertyBinder
     /// inside this method at the same time. Keep the implementation stateless, or guard whatever state
     /// it holds. The library never copies, resets or locks around a binder.
     /// </para>
+    /// <para>
+    /// <b>A binder is trusted code that receives secrets.</b> It is handed the complete environment
+    /// value verbatim, which routinely means a password, connection string or API key. The library does
+    /// not sandbox, redact or inspect it. An implementation must:
+    /// </para>
+    /// <list type="bullet">
+    /// <item><description>be deterministic - the same input must always produce an equivalent result;</description></item>
+    /// <item><description>be thread-safe, because one instance is shared by every options instance a
+    /// registration produces and the library calls it concurrently without serialising;</description></item>
+    /// <item><description>never log, print, cache or otherwise retain the value it is given, in memory or
+    /// anywhere else.</description></item>
+    /// </list>
+    /// <para>
+    /// Exceptions thrown by a binder are sanitised: only the exception's type name survives, never its
+    /// message. The one exception is <see cref="OperationCanceledException"/>, which is propagated
+    /// unchanged as the caller's own control flow, so a cancellation message must not carry a value.
+    /// </para>
     /// </remarks>
     object? Convert(string value, Type targetType, CultureInfo culture);
 }

@@ -5,6 +5,15 @@ using System.Globalization;
 
 namespace FriendlyEnvars;
 
+/// <summary>
+/// The binder used unless a custom one is supplied. Converts the common BCL types directly, and falls
+/// back to the target type's <see cref="TypeConverter"/> for anything else.
+/// </summary>
+/// <remarks>
+/// This type is stateless and therefore thread-safe. Note that its <see cref="TypeConverter"/> fallback
+/// passes the complete environment value to code the library does not control; see
+/// <see cref="IEnvarPropertyBinder"/> for what that implies.
+/// </remarks>
 public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
 {
     [StackTraceHidden]
@@ -49,6 +58,19 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
         };
     }
 
+    /// <summary>
+    /// Last resort for a type this binder has no built-in rule for: whatever
+    /// <see cref="TypeDescriptor.GetConverter(Type)"/> returns for it.
+    /// </summary>
+    /// <remarks>
+    /// <b>This hands the complete environment value to third-party code.</b> The converter is chosen by
+    /// the target type - it may come from that type's own <see cref="TypeConverterAttribute"/>, from a
+    /// base type, or from a converter registered elsewhere in the process - and it is as trusted as any
+    /// custom binder: it receives the value verbatim, secrets included, and the library does not
+    /// sandbox, redact or inspect it. A converter reached this way must be deterministic and
+    /// thread-safe, and must not log or retain what it is given. Supply an
+    /// <see cref="IEnvarPropertyBinder"/> instead if you need control over which code sees the value.
+    /// </remarks>
     [StackTraceHidden]
     private static object? ConvertUsingTypeConverter(string value, Type targetType, CultureInfo culture)
     {

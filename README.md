@@ -195,10 +195,26 @@ services.AddOptions<DatabaseSettings>()
     });
 ```
 
-> **Your binder must be thread-safe.** One instance is shared by every options instance the
-> registration produces, and FriendlyEnvars calls it concurrently without serialising: resolving options
-> from several threads at once puts several threads inside `Convert` simultaneously. Keep it stateless,
-> or guard whatever state it holds. The library never copies, resets or locks around a binder.
+##### The converter/binder trust boundary
+
+A binder is **trusted code that receives secrets.** FriendlyEnvars hands it the complete environment
+value verbatim — routinely a password, connection string or API key — and does not sandbox, redact or
+inspect it. The same is true of the `TypeConverter` fallback in `DefaultEnvarPropertyBinder`, which is
+reached for any type without a built-in rule and may resolve to a converter declared on the target type
+or registered anywhere else in the process.
+
+An implementation must:
+
+- **be deterministic** — the same input must always produce an equivalent result;
+- **be thread-safe** — one instance is shared by every options instance the registration produces, and
+  FriendlyEnvars calls it concurrently without serialising, so resolving options from several threads at
+  once puts several threads inside `Convert` simultaneously. Keep it stateless, or guard whatever state
+  it holds. The library never copies, resets or locks around a binder;
+- **never log, print, cache or otherwise retain** the value it is given.
+
+Exceptions thrown by a binder are sanitised — only the exception's type name survives, never its message
+— so a failure cannot leak the value. The one exception is `OperationCanceledException`, which is
+propagated unchanged as your own control flow; do not put a value in a cancellation message.
 
 #### Configuration Precedence
 
