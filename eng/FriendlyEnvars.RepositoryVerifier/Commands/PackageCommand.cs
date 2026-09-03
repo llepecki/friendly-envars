@@ -24,6 +24,7 @@ internal static class PackageCommand
         string? suppressionsFile = commandLine.GetOptional("suppressions-file");
         string? projectFile = commandLine.GetOptional("project");
         string? expectedBaseline = commandLine.GetOptional("expect-validation-baseline");
+        var expectedDependencies = commandLine.GetMany("expect-dependency");
         commandLine.EnsureAllConsumed();
 
         using var package = NuGetPackage.Open(packagePath);
@@ -46,6 +47,11 @@ internal static class PackageCommand
 
         VerifyMetadataAsset(package, "icon", expectedIcon, failures);
         VerifyMetadataAsset(package, "readme", expectedReadme, failures);
+
+        if (expectedDependencies.Count > 0)
+        {
+            VerifyDependencies(package, expectedDependencies, failures);
+        }
 
         if (suppressionsFile is not null)
         {
@@ -261,6 +267,54 @@ internal static class PackageCommand
             {
                 failures.Add($"<NoWarn> silences the compatibility diagnostic '{match.Value}'");
             }
+        }
+    }
+
+    /// <summary>
+    /// Asserts the package's declared dependency ids exactly, across every dependency group.
+    /// </summary>
+    /// <remarks>
+    /// This is the observable consequence of <c>PrivateAssets=all</c> on a development-only reference.
+    /// An analyzer that loses it stops being private and starts appearing here, which would force it on
+    /// every consumer of the library. An unexpected id therefore fails as loudly as a missing one, and
+    /// the check is on the packed artifact rather than on project text, so it cannot be satisfied by a
+    /// setting that the build did not actually apply.
+    /// </remarks>
+    private static void VerifyDependencies(NuGetPackage package, IReadOnlyList<string> expected, List<string> failures)
+    {
+        var actual = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var declared = package.Metadata
+            .Elements()
+            .Where(static element => element.Name.LocalName == "dependencies")
+            .SelectMany(static group => group.Descendants())
+            .Where(static element => element.Name.LocalName == "dependency");
+
+        foreach (var dependency in declared)
+        {
+            string? id = dependency.Attribute("id")?.Value?.Trim();
+
+            if (string.IsNullOrEmpty(id))
+            {
+                failures.Add("a <dependency> element declares no id");
+                continue;
+            }
+
+            actual.Add(id);
+        }
+
+        var expectedSet = new SortedSet<string>(expected, StringComparer.OrdinalIgnoreCase);
+
+        foreach (string missing in expectedSet.Except(actual, StringComparer.OrdinalIgnoreCase))
+        {
+            failures.Add($"expected package dependency '{missing}' is not declared");
+        }
+
+        foreach (string unexpected in actual.Except(expectedSet, StringComparer.OrdinalIgnoreCase))
+        {
+            failures.Add(
+                $"package declares an unexpected dependency '{unexpected}'; a development-only reference " +
+                "must keep <PrivateAssets>all</PrivateAssets> so it never reaches consumers");
         }
     }
 

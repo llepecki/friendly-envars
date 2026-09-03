@@ -49,7 +49,9 @@ jobs:
           dotnet --list-sdks
 
       - name: Restore
-        run: dotnet restore FriendlyEnvars.slnx
+        # Locked mode fails rather than resolving a version the committed packages.lock.json does not
+        # record, so a dependency cannot change in CI without the lock file change appearing in review.
+        run: dotnet restore FriendlyEnvars.slnx --locked-mode
 
       - name: Build
         run: dotnet build --no-restore --configuration Release -p:VersionSuffix="${{ steps.version.outputs.suffix }}" FriendlyEnvars.slnx
@@ -62,6 +64,9 @@ jobs:
 
       - name: Run sample
         run: eng/run-sample.sh
+
+      - name: Audit dependencies
+        run: eng/audit-dependencies.sh
 
       - name: Publish Test Results
         uses: dorny/test-reporter@v1
@@ -112,7 +117,9 @@ jobs:
           dotnet-version: ${{ env.DOTNET_SDK_VERSIONS }}
 
       - name: Restore
-        run: dotnet restore FriendlyEnvars.slnx
+        # Locked mode fails rather than resolving a version the committed packages.lock.json does not
+        # record, so a dependency cannot change in CI without the lock file change appearing in review.
+        run: dotnet restore FriendlyEnvars.slnx --locked-mode
 
       - name: Build
         run: dotnet build --no-restore --configuration Release FriendlyEnvars.slnx

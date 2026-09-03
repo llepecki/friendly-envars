@@ -78,7 +78,8 @@ run_verifier package \
     --expect-readme "README.md" \
     --project "$REPO_ROOT/src/FriendlyEnvars/FriendlyEnvars.csproj" \
     --expect-validation-baseline "1.1.0" \
-    --suppressions-file "$REPO_ROOT/src/FriendlyEnvars/CompatibilitySuppressions.xml"
+    --suppressions-file "$REPO_ROOT/src/FriendlyEnvars/CompatibilitySuppressions.xml" \
+    --expect-dependency "Microsoft.Extensions.Options"
 
 run_verifier package-manifest \
     --package "$NUPKG" \

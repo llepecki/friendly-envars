@@ -4,8 +4,11 @@
     </Folder>
     <Folder Name="/root/">
         <File Path=".editorconfig" />
+        <File Path=".github/dependabot.yml" />
         <File Path=".github/workflows/ci.yml" />
         <File Path=".gitignore" />
+        <File Path="Directory.Build.props" />
+        <File Path="NuGet.config" />
         <File Path="README.md" />
         <File Path="LICENSE" />
     </Folder>

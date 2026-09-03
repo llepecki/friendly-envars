@@ -78,20 +78,18 @@ internal sealed class NuGetPackage : IDisposable
         }
     }
 
+    /// <summary>The nuspec's &lt;metadata&gt; element, which every well-formed package declares.</summary>
+    public XElement Metadata =>
+        Nuspec.Root?.Elements().FirstOrDefault(static e => e.Name.LocalName == "metadata")
+        ?? throw new VerificationException($"Package '{Path}' has a .nuspec with no <metadata> element.");
+
     /// <summary>
     /// Reads a single &lt;metadata&gt; child by local name, ignoring the nuspec schema namespace, which
     /// varies by SDK version.
     /// </summary>
     public string? GetMetadata(string localName)
     {
-        var metadata = Nuspec.Root?.Elements().FirstOrDefault(static e => e.Name.LocalName == "metadata");
-
-        if (metadata is null)
-        {
-            throw new VerificationException($"Package '{Path}' has a .nuspec with no <metadata> element.");
-        }
-
-        var matches = metadata.Elements().Where(e => e.Name.LocalName == localName).ToArray();
+        var matches = Metadata.Elements().Where(e => e.Name.LocalName == localName).ToArray();
 
         if (matches.Length == 0)
         {
