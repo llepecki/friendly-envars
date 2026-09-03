@@ -46,8 +46,13 @@ public sealed record EnvarSettings
     /// Configures a custom property binder for type conversion.
     /// </summary>
     /// <param name="binder">The custom property binder to use for type conversion.</param>
-    /// <returns>A new <see cref="EnvarSettings"/> instance with the specified binder.</returns>
+    /// <returns>The same <see cref="EnvarSettings"/> instance, so calls can be chained.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="binder"/> is null.</exception>
+    /// <remarks>
+    /// The reference is captured when <c>BindEnvars</c> returns, and the one instance is reused for every
+    /// options instance this registration produces. Whatever state the binder holds internally is the
+    /// caller's responsibility: the library never copies, resets or synchronises it.
+    /// </remarks>
     /// <example>
     /// <para>Custom binder class:</para>
     /// <code>
@@ -71,6 +76,8 @@ public sealed record EnvarSettings
     /// </example>
     public EnvarSettings UseCustomEnvarPropertyBinder(IEnvarPropertyBinder binder)
     {
+        ArgumentNullException.ThrowIfNull(binder);
+
         EnvarPropertyBinder = binder;
         return this;
     }
@@ -79,9 +86,13 @@ public sealed record EnvarSettings
     /// Configures the culture used for type conversion.
     /// </summary>
     /// <param name="culture">The culture to use for parsing numeric and date values.</param>
-    /// <returns>A new <see cref="EnvarSettings"/> instance with the specified culture.</returns>
+    /// <returns>The same <see cref="EnvarSettings"/> instance, so calls can be chained.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="culture"/> is null.</exception>
     /// <remarks>
+    /// <para>
+    /// <c>BindEnvars</c> captures a read-only clone of this culture, so mutating the instance you passed
+    /// in afterwards cannot change how values are parsed.
+    /// </para>
     /// By default, <see cref="CultureInfo.InvariantCulture"/> is used to ensure consistent
     /// parsing regardless of the system locale. Use this method when environment variables
     /// contain culture-specific formats. This culture is also applied to fallback
@@ -106,6 +117,8 @@ public sealed record EnvarSettings
     /// </example>
     public EnvarSettings UseCulture(CultureInfo culture)
     {
+        ArgumentNullException.ThrowIfNull(culture);
+
         Culture = culture;
         return this;
     }

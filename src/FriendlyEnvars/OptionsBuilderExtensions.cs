@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 namespace FriendlyEnvars;
 
@@ -107,9 +108,11 @@ public static class OptionsBuilderExtensions
         var settings = new EnvarSettings();
         configure?.Invoke(settings);
 
-        // Captured now, so that mutating the settings object afterwards cannot influence binding.
+        // Captured now, so that mutating the settings object afterwards cannot influence binding. The
+        // culture is cloned and frozen as well, because CultureInfo is mutable and the caller keeps a
+        // reference to the instance they supplied.
         var binder = settings.EnvarPropertyBinder;
-        var culture = settings.Culture;
+        var culture = CultureInfo.ReadOnly((CultureInfo)settings.Culture.Clone());
         string optionsName = optionsBuilder.Name;
 
         // Discovery, validation and the environment snapshot all happen here, before the service

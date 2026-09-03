@@ -355,6 +355,37 @@ public class OptionsLifecycleTests : EnvarTestsBase
         }
     }
 
+    public class NumericCultureOptions
+    {
+        [Envar("H03_DECIMAL")]
+        public double Value { get; set; }
+    }
+
+    [Fact]
+    public void MutatingTheSuppliedCultureAfterRegistration_DoesNotAffectAnyOptionsAbstraction()
+    {
+        SetEnvironmentVariable("H03_DECIMAL", "1.5");
+
+        // Constructed rather than fetched from the cache, so it is mutable.
+        var culture = new CultureInfo("en-US");
+
+        var services = new ServiceCollection();
+        services.AddOptions<NumericCultureOptions>().BindEnvars(settings => settings.UseCulture(culture));
+
+        using var provider = services.BuildServiceProvider();
+
+        // Would turn "1.5" into 15 if the live instance were consulted at options-creation time.
+        culture.NumberFormat.NumberDecimalSeparator = ",";
+        culture.NumberFormat.NumberGroupSeparator = ".";
+
+        Assert.Equal(1.5d, provider.GetRequiredService<IOptions<NumericCultureOptions>>().Value.Value);
+        Assert.Equal(1.5d, provider.GetRequiredService<IOptionsFactory<NumericCultureOptions>>().Create(Options.DefaultName).Value);
+        Assert.Equal(1.5d, provider.GetRequiredService<IOptionsMonitor<NumericCultureOptions>>().CurrentValue.Value);
+
+        using var scope = provider.CreateScope();
+        Assert.Equal(1.5d, scope.ServiceProvider.GetRequiredService<IOptionsSnapshot<NumericCultureOptions>>().Value.Value);
+    }
+
     [Fact]
     public void EachNamedRegistrationKeepsItsOwnSnapshot()
     {
