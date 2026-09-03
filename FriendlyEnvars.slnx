@@ -1,6 +1,6 @@
 <Solution>
     <Folder Name="/resources/">
-        <File Path="resources\icon.png" />
+        <File Path="resources/icon-v2.png" />
     </Folder>
     <Folder Name="/root/">
         <File Path=".editorconfig" />
@@ -13,6 +13,6 @@
         <Project Path="src/FriendlyEnvars/FriendlyEnvars.csproj" />
     </Folder>
     <Folder Name="/tests/">
-        <Project Path="tests\FriendlyEnvars.Tests\FriendlyEnvars.Tests.csproj" Type="Classic C#" />
+        <Project Path="tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj" />
     </Folder>
 </Solution>
