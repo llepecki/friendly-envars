@@ -12,7 +12,13 @@ namespace FriendlyEnvars;
 /// The property must have a setter (either <c>set</c> or <c>init</c>).
 /// </para>
 /// <para>
-/// If the environment variable is not set or is empty, the property will retain its default value.
+/// If the environment variable is not set, the property keeps whatever value the type gives it. An
+/// empty string is a value, not an absence: it is captured and passed to the binder, which means a
+/// <see cref="string"/> property becomes empty and a non-string property fails to convert.
+/// </para>
+/// <para>
+/// The value is captured once, while <c>BindEnvars</c> runs. Changing the variable afterwards does not
+/// affect any options instance.
 /// </para>
 /// </remarks>
 /// <example>

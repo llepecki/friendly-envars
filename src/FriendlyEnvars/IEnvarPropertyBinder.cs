@@ -28,7 +28,7 @@ namespace FriendlyEnvars;
 ///         }
 ///
 ///         // Handle TimeSpan from seconds
-///         if (targetType == typeof(TimeSpan) && int.TryParse(value, out int seconds))
+///         if (targetType == typeof(TimeSpan) &amp;&amp; int.TryParse(value, out int seconds))
 ///         {
 ///             return TimeSpan.FromSeconds(seconds);
 ///         }

@@ -6,6 +6,9 @@ using System.Globalization;
 
 namespace FriendlyEnvars;
 
+/// <summary>
+/// Adds environment-variable binding to an <see cref="OptionsBuilder{TOptions}"/>.
+/// </summary>
 public static class OptionsBuilderExtensions
 {
     /// <summary>
@@ -45,8 +48,9 @@ public static class OptionsBuilderExtensions
     /// <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/>,
     /// <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> and
     /// <see cref="Microsoft.Extensions.Options.IOptionsFactory{TOptions}"/> all resolve normally.
-    /// Environment variables do not change while the process runs, so every one of them observes the
-    /// same values.
+    /// Every value is captured once, while this method runs, and every options instance is built from
+    /// that snapshot, so all four abstractions observe the same values. Changing a variable afterwards
+    /// changes nothing; the values do not refresh.
     /// </para>
     /// </remarks>
     /// <example>

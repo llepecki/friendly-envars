@@ -81,6 +81,7 @@ run_verifier package-manifest \
     --package "$NUPKG" \
     --require "/icon-v2.png" \
     --require "/README.md" \
-    --require "/lib/net8.0/FriendlyEnvars.dll"
+    --require "/lib/net8.0/FriendlyEnvars.dll" \
+    --require "/lib/net8.0/FriendlyEnvars.xml"
 
 echo "verify-package: OK"

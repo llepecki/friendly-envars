@@ -16,6 +16,35 @@ namespace FriendlyEnvars;
 /// </remarks>
 public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DefaultEnvarPropertyBinder"/> class.
+    /// </summary>
+    /// <remarks>
+    /// The type is stateless, so one instance can serve any number of registrations. FriendlyEnvars
+    /// shares a single instance internally when no custom binder is supplied.
+    /// </remarks>
+    public DefaultEnvarPropertyBinder()
+    {
+    }
+
+    /// <summary>
+    /// Converts an environment-variable value to <paramref name="targetType"/>.
+    /// </summary>
+    /// <param name="value">The environment variable's value. May be an empty string.</param>
+    /// <param name="targetType">The property's declared type, including <see cref="Nullable{T}"/>.</param>
+    /// <param name="culture">The culture to parse numeric, date and time values with.</param>
+    /// <returns>The converted value.</returns>
+    /// <exception cref="FormatException">The value does not have the form the target type requires.</exception>
+    /// <exception cref="OverflowException">The value is outside the target type's range.</exception>
+    /// <exception cref="NotSupportedException">No conversion to the target type is available.</exception>
+    /// <remarks>
+    /// Handles the common BCL types directly and enums under an explicit grammar. Anything else falls
+    /// back to the target type's <see cref="TypeConverter"/>, which hands the complete value - secrets
+    /// included - to code this library does not control. A converter reached that way is as trusted as
+    /// a custom binder: it must be deterministic and thread-safe, and must not log or retain what it is
+    /// given. Supply an <see cref="IEnvarPropertyBinder"/> instead if you need control over which code
+    /// sees the value.
+    /// </remarks>
     [StackTraceHidden]
     public object? Convert(string value, Type targetType, CultureInfo culture)
     {

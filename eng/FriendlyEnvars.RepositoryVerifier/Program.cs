@@ -60,6 +60,10 @@ internal static class Program
                     PackageManifestCommand.Run(commandLine);
                     break;
 
+                case "docs":
+                    DocsCommand.Run(commandLine);
+                    break;
+
                 case "api-removals":
                     ApiRemovalsCommand.Run(commandLine);
                     break;

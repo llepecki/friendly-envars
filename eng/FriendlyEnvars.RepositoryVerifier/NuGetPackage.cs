@@ -106,6 +106,25 @@ internal sealed class NuGetPackage : IDisposable
         return matches[0].Value;
     }
 
+    /// <summary>Reads one entry's bytes, failing if it is absent or duplicated.</summary>
+    public byte[] ReadEntry(string packagePath)
+    {
+        string normalised = NormalisePackagePath(packagePath);
+        int count = CountEntries(normalised);
+
+        if (count != 1)
+        {
+            throw new VerificationException(
+                $"Package '{Path}' contains '{normalised}' {count} time(s); exactly 1 is required.");
+        }
+
+        using var stream = _archive.GetEntry(normalised)!.Open();
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+
+        return buffer.ToArray();
+    }
+
     public int CountEntries(string packagePath)
     {
         string normalised = NormalisePackagePath(packagePath);

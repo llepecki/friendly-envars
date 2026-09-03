@@ -314,15 +314,15 @@ earlier `Configure` established.
 `IOptions<T>`, `IOptionsSnapshot<T>`, `IOptionsMonitor<T>` and `IOptionsFactory<T>` all resolve normally.
 FriendlyEnvars does not replace, block or otherwise interfere with any of them.
 
-Because environment variables do not change while the process runs, every one of these abstractions
-observes the same values. `IOptionsSnapshot<T>` and `IOptionsMonitor<T>` will not pick up a variable
-that is changed after startup.
+Every value is captured once, while `BindEnvars()` runs, and every options instance is built from that
+snapshot, so all four abstractions observe the same values. Changing a variable afterwards changes
+nothing — `IOptionsSnapshot<T>` and `IOptionsMonitor<T>` do not re-read the environment.
 
 ### ⚠️ Breaking Changes
 
-#### Empty Environment Variables (v2.x)
+#### Empty Environment Variables (since v1.1.0)
 
-Previously, environment variables set to an empty string (`""`) were treated the same as unset variables — the property would retain its default value. Now, empty strings are passed to the binder. This means:
+Before v1.1.0, environment variables set to an empty string (`""`) were treated the same as unset variables — the property would retain its default value. Since v1.1.0, empty strings are passed to the binder. This means:
 
 - `string` properties will be set to `""` instead of keeping their default.
 - Non-string properties (e.g., `int`, `bool`) will throw a `FormatException` wrapped in `EnvarsException` if the environment variable is empty.
@@ -331,7 +331,7 @@ If you relied on the old behavior of ignoring empty values, either unset the var
 
 ### ⚠️ Limitations
 
-- No runtime refresh: environment variables are read once on application startup.
+- No runtime refresh: each value is captured once, when `BindEnvars()` runs, and never re-read.
 - `IOptionsSnapshot` and `IOptionsMonitor` resolve normally, but they behave as read-only views of the startup values.
 
 ---

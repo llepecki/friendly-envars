@@ -7,9 +7,10 @@ namespace FriendlyEnvars;
 /// Configuration settings for environment variable binding behavior.
 /// </summary>
 /// <remarks>
-/// This record provides a fluent API for configuring how environment variables
-/// are bound to configuration objects, including type conversion, culture settings,
-/// and options pattern behavior.
+/// Provides a fluent API for configuring how environment variables are converted: which binder to use
+/// and which culture to parse with. Each method mutates and returns this same instance rather than
+/// creating a new one, so calls can be chained. The object is read only while <c>BindEnvars</c> runs;
+/// changing it afterwards has no effect.
 /// </remarks>
 /// <example>
 /// <code>
