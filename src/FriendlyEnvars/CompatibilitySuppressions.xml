@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Intentional breaking changes from published 1.1.0 to 2.0.0.
+
+  Every entry below is scoped to a single diagnostic and a single target, is marked as a baseline
+  suppression, and is immediately preceded by a comment naming the finding that made the change and why
+  it was made. eng/verify-package.sh enforces all of that, so a suppression cannot be added here without
+  an accountable justification.
+
+  Diagnostic IDs: https://learn.microsoft.com/dotnet/fundamentals/package-validation/diagnostic-ids
+-->
+<Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <!-- REV-H09: BlockOptionsMonitor() replaced IOptionsMonitor<T> with a registration that threw NotSupportedException, misrepresenting what the library does; removed outright with no replacement. -->
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:FriendlyEnvars.EnvarSettings.BlockOptionsMonitor</Target>
+    <Left>lib/net8.0/FriendlyEnvars.dll</Left>
+    <Right>lib/net8.0/FriendlyEnvars.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <!-- REV-H09: BlockOptionsSnapshot() replaced IOptionsSnapshot<T> with a registration that threw NotSupportedException, misrepresenting what the library does; removed outright with no replacement. -->
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:FriendlyEnvars.EnvarSettings.BlockOptionsSnapshot</Target>
+    <Left>lib/net8.0/FriendlyEnvars.dll</Left>
+    <Right>lib/net8.0/FriendlyEnvars.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <!-- REV-H01: EnvarsException is sealed so the structured, secret-safe failure contract cannot be subverted by a derived type that reintroduces the value into its message. -->
+  <Suppression>
+    <DiagnosticId>CP0009</DiagnosticId>
+    <Target>T:FriendlyEnvars.EnvarsException</Target>
+    <Left>lib/net8.0/FriendlyEnvars.dll</Left>
+    <Right>lib/net8.0/FriendlyEnvars.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+</Suppressions>

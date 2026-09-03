@@ -75,7 +75,10 @@ run_verifier package \
     --expect-id "$PACKAGE_ID" \
     --expect-version "$PACKAGE_VERSION" \
     --expect-icon "icon-v2.png" \
-    --expect-readme "README.md"
+    --expect-readme "README.md" \
+    --project "$REPO_ROOT/src/FriendlyEnvars/FriendlyEnvars.csproj" \
+    --expect-validation-baseline "1.1.0" \
+    --suppressions-file "$REPO_ROOT/src/FriendlyEnvars/CompatibilitySuppressions.xml"
 
 run_verifier package-manifest \
     --package "$NUPKG" \

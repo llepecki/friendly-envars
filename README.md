@@ -320,12 +320,34 @@ nothing — `IOptionsSnapshot<T>` and `IOptionsMonitor<T>` do not re-read the en
 
 ### ⚠️ Breaking Changes
 
+#### What changed in 2.0
+
+- **Exceptions are sealed and structured.** `EnvarsException` is sealed and carries `FailureKind` plus
+  the environment-variable name, options type and name, property, target type, culture, binder type and
+  the cause's type name. A library-generated failure never contains the value, the cause's message, or
+  an inner exception. `OperationCanceledException` propagates unchanged.
+- **The options-blocking configuration was removed** with no replacement. `IOptions<T>`,
+  `IOptionsSnapshot<T>`, `IOptionsMonitor<T>` and `IOptionsFactory<T>` all resolve normally.
+- **Property shapes and variable names are validated eagerly,** while `BindEnvars()` runs, rather than
+  lazily at options creation — so a bad options type fails at startup even when the variable is absent.
+- **Registering the same options type and name twice throws** `InvalidOperationException`.
+- **Values are captured once,** while `BindEnvars()` runs. Changing a variable afterwards affects
+  nothing.
+- **Enum text follows an explicit grammar** instead of `Enum.Parse`. Three differences are deliberate:
+  a non-flags enum rejects `"-1"` even when `All = -1` is declared; a non-flags enum rejects
+  `"Read,Write"` even when `ReadWrite = 3` is declared; and a flags enum rejects negative numeric text
+  while still accepting the declared member name. In each case the value stays reachable by name.
+- **`BindEnvars<T>` declares `[DynamicallyAccessedMembers(PublicProperties)]`** on `T`, so trimmed apps
+  keep the properties reflection needs.
+- **The configured culture is cloned and frozen** when captured, so a binder that mutates it now throws
+  instead of silently changing later parsing.
+
 #### Empty Environment Variables (since v1.1.0)
 
 Before v1.1.0, environment variables set to an empty string (`""`) were treated the same as unset variables — the property would retain its default value. Since v1.1.0, empty strings are passed to the binder. This means:
 
 - `string` properties will be set to `""` instead of keeping their default.
-- Non-string properties (e.g., `int`, `bool`) will throw a `FormatException` wrapped in `EnvarsException` if the environment variable is empty.
+- Non-string properties (e.g., `int`, `bool`) throw `EnvarsException` with `FailureKind.Conversion` and `CauseType` `System.FormatException` if the environment variable is empty. The cause itself is not retained, so `InnerException` is `null`.
 
 If you relied on the old behavior of ignoring empty values, either unset the variable entirely or use a custom `IEnvarPropertyBinder` to handle empty strings.
 

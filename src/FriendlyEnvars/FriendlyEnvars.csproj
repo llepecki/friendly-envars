@@ -14,21 +14,47 @@
     </PropertyGroup>
     <PropertyGroup>
         <PackageId>FriendlyEnvars</PackageId>
-        <VersionPrefix>1.1.0</VersionPrefix>
+        <VersionPrefix>2.0.0</VersionPrefix>
         <PackageReleaseNotes>
-## Breaking Changes
-- Empty environment variables ("") are now passed to the binder instead of being treated as unset. String properties will be set to "" instead of keeping defaults; non-string properties will throw FormatException for empty values.
+## Intentional breaking changes in 2.0.0
 
-## New Features
-- [Flags] enum support for combined values (e.g., "Read, Write")
+- Exceptions are sealed and structured. EnvarsException is sealed and now carries FailureKind plus the
+  environment-variable name, options type and name, property, target type, culture, binder type and the
+  cause's type name. Library-generated failures never include the value, the cause's message or an inner
+  exception, so a leaked log cannot disclose a secret. OperationCanceledException is propagated
+  unchanged rather than wrapped.
+- The two options-blocking configuration methods are removed with no replacement. IOptions,
+  IOptionsSnapshot, IOptionsMonitor and IOptionsFactory all resolve normally.
+- Property shapes and environment-variable names are validated eagerly, while BindEnvars runs, instead
+  of lazily at options creation. A getter-only, static, indexed or non-public-setter property, or a name
+  that is empty, whitespace only, contains '=' or contains a control character, now fails at
+  registration even when the variable is absent.
+- Registering FriendlyEnvars twice for the same options type and name throws InvalidOperationException.
+- Values are captured once, while BindEnvars runs, and every options instance is built from that
+  snapshot. Changing a variable afterwards no longer affects anything, including IOptionsSnapshot and
+  IOptionsMonitor.
+- Enum text follows an explicit grammar instead of Enum.Parse. Three differences from 1.1.0 are
+  deliberate: a non-flags enum rejects the numeric "-1" even when a member such as All = -1 is declared;
+  a non-flags enum rejects "Read,Write" even when ReadWrite = 3 is declared; and a flags enum rejects
+  negative numeric text while still accepting the corresponding declared member name. Names that differ
+  only by case are resolved deterministically, and a value whose bit pattern contains bits no declared
+  member defines is rejected.
+- BindEnvars&lt;T&gt; declares [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)]
+  on T, so trimmed applications preserve the properties reflection needs.
+- The configured culture is cloned and frozen when it is captured. A binder that mutates the culture it
+  is given now throws instead of silently changing how later values parse.
 
-## Bug Fixes
-- Fixed enum values not being returned from the binder
-- TypeConverter conversions now respect the configured culture setting
-- Changed char parsing to use char.Parse() for clearer error messages
+## Not new in 2.0
 
-## Performance
-- Added property metadata caching to avoid repeated reflection
+- Empty environment variables ("") have been passed to the binder rather than treated as unset since
+  1.1.0. String properties become empty and non-string properties fail to convert. This is listed here
+  only because it is often mistaken for a 2.0 change.
+
+## Other changes
+
+- XML documentation is generated and packaged.
+- Lambdas that capture no state are marked static, reducing allocations.
+- New package icon.
         </PackageReleaseNotes>
         <Authors>Lukasz Lepecki</Authors>
         <Description>Simplify your .NET configuration. FriendlyEnvars maps environment variables directly to strongly-typed options classes - no JSON files, no complex setup. Just define your settings class and you're done. Fully compatible with IOptions, naturally integrates with existing codebase.</Description>
@@ -41,11 +67,16 @@
         <RepositoryType>git</RepositoryType>
         <PackageIcon>icon-v2.png</PackageIcon>
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+        <EnablePackageValidation>true</EnablePackageValidation>
+        <PackageValidationBaselineVersion>1.1.0</PackageValidationBaselineVersion>
     </PropertyGroup>
     <ItemGroup>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
             <_Parameter1>FriendlyEnvars.Tests</_Parameter1>
         </AssemblyAttribute>
+    </ItemGroup>
+    <ItemGroup>
+        <ApiCompatSuppressionFile Include="CompatibilitySuppressions.xml" />
     </ItemGroup>
     <ItemGroup>
         <None Include="..\..\README.md" Pack="true" PackagePath="\" />
