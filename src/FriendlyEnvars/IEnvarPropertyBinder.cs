@@ -59,13 +59,20 @@ public interface IEnvarPropertyBinder
     /// <exception cref="OverflowException">Thrown when the value is outside the range of the target type.</exception>
     /// <remarks>
     /// <para>
-    /// This method is called for each property marked with <see cref="EnvarAttribute"/> 
-    /// when the corresponding environment variable has a non-null value (empty values
-    /// may be passed).
+    /// This method is called for each property marked with <see cref="EnvarAttribute"/> whose
+    /// environment variable was present when the options were registered. An empty value is a present
+    /// value and is passed through.
     /// </para>
     /// <para>
-    /// The implementation should handle nullable types by checking if the target type 
+    /// The implementation should handle nullable types by checking if the target type
     /// is nullable using <see cref="Nullable.GetUnderlyingType"/>.
+    /// </para>
+    /// <para>
+    /// <b>Thread safety is the implementer's responsibility.</b> One binder instance is shared by every
+    /// options instance a registration produces, and the library calls it concurrently without any
+    /// serialisation of its own: creating options from several threads at once puts several threads
+    /// inside this method at the same time. Keep the implementation stateless, or guard whatever state
+    /// it holds. The library never copies, resets or locks around a binder.
     /// </para>
     /// </remarks>
     object? Convert(string value, Type targetType, CultureInfo culture);

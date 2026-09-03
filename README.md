@@ -195,6 +195,11 @@ services.AddOptions<DatabaseSettings>()
     });
 ```
 
+> **Your binder must be thread-safe.** One instance is shared by every options instance the
+> registration produces, and FriendlyEnvars calls it concurrently without serialising: resolving options
+> from several threads at once puts several threads inside `Convert` simultaneously. Keep it stateless,
+> or guard whatever state it holds. The library never copies, resets or locks around a binder.
+
 #### Working with `IOptionsSnapshot` and `IOptionsMonitor`
 
 `IOptions<T>`, `IOptionsSnapshot<T>`, `IOptionsMonitor<T>` and `IOptionsFactory<T>` all resolve normally.
