@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Xunit;
 
@@ -41,12 +42,12 @@ public class WhitespaceAndEmptyValueTests : EnvarTestsBase
     [Fact]
     public void BindFromEnvironmentVariables_WithEmptyStringValue_ShouldBindEmptyString()
     {
-        SetEnvironmentVariable("WHITESPACE_REQUIRED", "NonEmpty");
-        SetEnvironmentVariable("WHITESPACE_OPTIONAL", "");
-
         var services = new ServiceCollection();
-        services.AddOptions<WhitespaceOptions>()
-            .BindEnvars();
+        BindCapturedEnvironment<WhitespaceOptions>(services, new Dictionary<string, string?>
+        {
+            ["WHITESPACE_REQUIRED"] = "NonEmpty",
+            ["WHITESPACE_OPTIONAL"] = ""
+        });
 
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<WhitespaceOptions>>().Value;

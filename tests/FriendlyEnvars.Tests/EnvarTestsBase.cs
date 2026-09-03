@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 
@@ -11,6 +13,43 @@ public abstract class EnvarTestsBase : IDisposable
     {
         Environment.SetEnvironmentVariable(name, value);
         _environmentVariablesToCleanup.Add(name);
+    }
+
+    /// <summary>
+    /// Registers <typeparamref name="T"/> against an explicit set of captured environment values rather
+    /// than the process environment.
+    /// </summary>
+    /// <remarks>
+    /// Required for any test that needs an intentionally empty value: on net8.0
+    /// <see cref="Environment.SetEnvironmentVariable(string, string)"/> with an empty value deletes the
+    /// variable instead of emptying it, whereas net10.0 stores a real empty value. Going through the
+    /// reader seam makes the scenario expressible identically on every supported target framework.
+    /// </remarks>
+    protected static OptionsBuilder<T> BindCapturedEnvironment<T>(
+        IServiceCollection services,
+        Dictionary<string, string?> capturedValues,
+        string optionsName = "") where T : class, new()
+    {
+        return OptionsBuilderExtensions.BindEnvarsCore(
+            services.AddOptions<T>(optionsName),
+            configure: null,
+            new CapturedEnvironmentReader(capturedValues),
+            NullBindingPlanObserver.Instance);
+    }
+
+    private sealed class CapturedEnvironmentReader : IEnvironmentVariableReader
+    {
+        private readonly Dictionary<string, string?> _values;
+
+        public CapturedEnvironmentReader(Dictionary<string, string?> values)
+        {
+            _values = values;
+        }
+
+        public string? GetEnvironmentVariable(string name)
+        {
+            return _values.GetValueOrDefault(name);
+        }
     }
 
     public virtual void Dispose()

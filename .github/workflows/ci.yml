@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ master ]
 
+env:
+  # global.json pins the SDK with rollForward disabled, so both patches must be installed exactly.
+  DOTNET_SDK_VERSIONS: |
+    8.0.424
+    10.0.400
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -27,31 +33,32 @@ jobs:
             echo "suffix=pr-${{ github.run_number }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Debug Version Info
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_SDK_VERSIONS }}
+
+      - name: Verify SDK selection
         run: |
-          echo "github.ref: ${{ github.ref }}"
-          echo "github.ref_name: ${{ github.ref_name }}"
-          echo "github.event_name: ${{ github.event_name }}"
-          echo "VersionSuffix: ${{ steps.version.outputs.suffix }}"
-
-      - name: Setup .NET 9 (for .slnx support)
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '9.0.x'
-
-      - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
+          set -euo pipefail
+          actual="$(dotnet --version)"
+          if [[ "$actual" != "10.0.400" ]]; then
+            echo "global.json must select SDK 10.0.400, got $actual" >&2
+            exit 1
+          fi
+          dotnet --list-sdks
 
       - name: Restore
-        run: dotnet restore --maxcpucount:1 FriendlyEnvars.slnx
+        run: dotnet restore FriendlyEnvars.slnx
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release --framework net8.0 --maxcpucount:1 -p:VersionSuffix="${{ steps.version.outputs.suffix }}" FriendlyEnvars.slnx
+        run: dotnet build --no-restore --configuration Release -p:VersionSuffix="${{ steps.version.outputs.suffix }}" FriendlyEnvars.slnx
 
-      - name: Test
-        run: dotnet test --no-restore --no-build --configuration Release --framework net8.0 --maxcpucount:1 --verbosity normal --logger trx --results-directory TestResults FriendlyEnvars.slnx
+      - name: Test (net8.0)
+        run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework net8.0 --logger trx --results-directory TestResults
+
+      - name: Test (net10.0)
+        run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework net10.0 --logger trx --results-directory TestResults
 
       - name: Publish Test Results
         uses: dorny/test-reporter@v1
@@ -62,7 +69,7 @@ jobs:
           reporter: dotnet-trx
 
       - name: Pack NuGet Package
-        run: dotnet pack --no-build --configuration Release --maxcpucount:1 -p:VersionSuffix="${{ steps.version.outputs.suffix }}" FriendlyEnvars.slnx
+        run: dotnet pack --no-build --configuration Release -p:VersionSuffix="${{ steps.version.outputs.suffix }}" src/FriendlyEnvars/FriendlyEnvars.csproj
 
       - name: Extract Package Version
         id: extract-version
@@ -81,3 +88,31 @@ jobs:
       - name: Publish NuGet Package
         if: github.ref == 'refs/heads/master'
         run: dotnet nuget push src/FriendlyEnvars/bin/Release/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+
+  portability:
+    name: Portability (${{ matrix.os }}, ${{ matrix.framework }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        framework: [ net8.0, net10.0 ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_SDK_VERSIONS }}
+
+      - name: Restore
+        run: dotnet restore FriendlyEnvars.slnx
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release FriendlyEnvars.slnx
+
+      - name: Portability tests
+        run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework ${{ matrix.framework }} --filter 'Category=Portability'

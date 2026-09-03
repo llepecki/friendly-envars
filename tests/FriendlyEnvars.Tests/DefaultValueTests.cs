@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Collections.Generic;
 using Xunit;
 
 namespace FriendlyEnvars.Tests;
@@ -39,11 +40,11 @@ public class DefaultValueTests : EnvarTestsBase
     [Fact]
     public void BindFromEnvironmentVariables_WithEmptyStringValue_ShouldBindEmptyString()
     {
-        SetEnvironmentVariable("DEFAULT_STRING", "");
-
         var services = new ServiceCollection();
-        services.AddOptions<DefaultValueOptions>()
-            .BindEnvars();
+        BindCapturedEnvironment<DefaultValueOptions>(services, new Dictionary<string, string?>
+        {
+            ["DEFAULT_STRING"] = ""
+        });
 
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<DefaultValueOptions>>().Value;
@@ -56,11 +57,11 @@ public class DefaultValueTests : EnvarTestsBase
     [Fact]
     public void BindFromEnvironmentVariables_WithEmptyNonStringValue_ShouldThrow()
     {
-        SetEnvironmentVariable("DEFAULT_INT", "");
-
         var services = new ServiceCollection();
-        services.AddOptions<DefaultValueOptions>()
-            .BindEnvars();
+        BindCapturedEnvironment<DefaultValueOptions>(services, new Dictionary<string, string?>
+        {
+            ["DEFAULT_INT"] = ""
+        });
 
         var serviceProvider = services.BuildServiceProvider();
         var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<DefaultValueOptions>>().Value);
