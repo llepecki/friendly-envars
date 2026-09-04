@@ -59,6 +59,18 @@ internal static class Program
                     ApiRemovalsCommand.Run(commandLine);
                     break;
 
+                case "attestation":
+                    AttestationCommand.Run(commandLine);
+                    break;
+
+                case "sbom":
+                    SbomCommand.Run(commandLine);
+                    break;
+
+                case "workflow":
+                    WorkflowCommand.Run(commandLine);
+                    break;
+
                 case "benchmark":
                     BenchmarkCommand.Run(commandLine);
                     break;

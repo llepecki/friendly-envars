@@ -11,4 +11,8 @@
         <RootNamespace>FriendlyEnvars.RepositoryVerifier</RootNamespace>
         <AssemblyName>FriendlyEnvars.RepositoryVerifier</AssemblyName>
     </PropertyGroup>
+    <ItemGroup>
+        <!-- The verifier's only third-party dependency, used by the workflow subcommand's YAML model. -->
+        <PackageReference Include="YamlDotNet" Version="18.1.0" />
+    </ItemGroup>
 </Project>

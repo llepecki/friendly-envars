@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions: {}
+
 env:
   # global.json pins the SDK with rollForward disabled, so both patches must be installed exactly.
   DOTNET_SDK_VERSIONS: |
@@ -13,111 +15,8 @@ env:
     10.0.400
 
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    name: Build and Test
-    permissions:
-      contents: read
-      actions: read
-      checks: write
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # eng/secret-scan.sh scans the full history across all refs, which a shallow clone
-          # cannot provide.
-          fetch-depth: 0
-
-      - name: Secret scan
-        run: eng/secret-scan.sh
-
-      - name: Set Version Suffix
-        id: version
-        run: |
-          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
-            echo "suffix=" >> $GITHUB_OUTPUT
-          else
-            echo "suffix=pr-${{ github.run_number }}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_SDK_VERSIONS }}
-
-      - name: Verify SDK selection
-        run: |
-          set -euo pipefail
-          actual="$(dotnet --version)"
-          if [[ "$actual" != "10.0.400" ]]; then
-            echo "global.json must select SDK 10.0.400, got $actual" >&2
-            exit 1
-          fi
-          dotnet --list-sdks
-
-      - name: Restore
-        # Locked mode fails rather than resolving a version the committed packages.lock.json does not
-        # record, so a dependency cannot change in CI without the lock file change appearing in review.
-        run: dotnet restore FriendlyEnvars.slnx --locked-mode
-
-      - name: Build
-        run: dotnet build --no-restore --configuration Release -p:VersionSuffix="${{ steps.version.outputs.suffix }}" FriendlyEnvars.slnx
-
-      - name: Test (net8.0)
-        run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework net8.0 --logger trx --results-directory TestResults
-
-      - name: Test (net10.0)
-        run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework net10.0 --logger trx --results-directory TestResults
-
-      - name: Run sample
-        run: eng/run-sample.sh
-
-      - name: Audit dependencies
-        run: eng/audit-dependencies.sh
-
-      - name: Publish Test Results
-        uses: dorny/test-reporter@v1
-        if: always()
-        with:
-          name: Test Results
-          path: TestResults/*.trx
-          reporter: dotnet-trx
-
-      - name: Pack NuGet Package
-        run: dotnet pack --no-build --configuration Release -p:VersionSuffix="${{ steps.version.outputs.suffix }}" src/FriendlyEnvars/FriendlyEnvars.csproj
-
-      - name: Extract Package Version
-        id: extract-version
-        run: |
-          PACKAGE_PATH=$(ls src/FriendlyEnvars/bin/Release/*.nupkg | head -1)
-          PACKAGE_VERSION=$(basename "$PACKAGE_PATH" .nupkg | sed 's/FriendlyEnvars\.//')
-          echo "version=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
-          echo "Package version: $PACKAGE_VERSION"
-
-      - name: Quick Start smoke consumer
-        # Proves the README Quick Start still works against the package that was just built, from
-        # projects that have never seen this repository.
-        #
-        # The Pack step above stamps pull-request builds as 2.0.0-pr-N, but the Quick Start documents
-        # the exact version 2.0.0 and this gate holds it to that, so it packs again without the
-        # suffix into its own directory. This pack exists only to feed the gate; the artifact that is
-        # uploaded and published is still the one from the step above.
-        run: |
-          dotnet pack --no-build --no-restore --configuration Release --output smoke-package src/FriendlyEnvars/FriendlyEnvars.csproj
-          eng/smoke-consumer.sh smoke-package/FriendlyEnvars.2.0.0.nupkg
-
-      - name: Upload NuGet Package
-        uses: actions/upload-artifact@v4
-        with:
-          name: friendly-envars-${{ steps.extract-version.outputs.version }}
-          path: src/FriendlyEnvars/bin/Release/*.nupkg
-
-      - name: Publish NuGet Package
-        if: github.ref == 'refs/heads/master'
-        run: dotnet nuget push src/FriendlyEnvars/bin/Release/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
-
-  portability:
-    name: Portability (${{ matrix.os }}, ${{ matrix.framework }})
+  validate:
+    name: Validate (${{ matrix.os }}, ${{ matrix.framework }})
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -126,22 +25,274 @@ jobs:
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
         framework: [ net8.0, net10.0 ]
-
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          # eng/secret-scan.sh scans the full history across all refs.
+          fetch-depth: 0
+
+      - name: Secret scan
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/secret-scan.sh
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: ${{ env.DOTNET_SDK_VERSIONS }}
+
+      - name: Verify SDK selection
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(dotnet --version)"
+          if [[ "$actual" != "10.0.400" ]]; then
+            echo "global.json must select SDK 10.0.400, got $actual" >&2
+            exit 1
+          fi
+
+      - name: Restore
+        run: dotnet restore FriendlyEnvars.slnx --locked-mode
+
+      - name: Validate workflows
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/validate-workflows.sh
+
+      - name: Verify formatting
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: dotnet format FriendlyEnvars.slnx --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build FriendlyEnvars.slnx --no-restore --configuration Release --warnaserror
+
+      - name: Full tests
+        if: matrix.os == 'ubuntu-latest'
+        run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework ${{ matrix.framework }}
+
+      - name: Portability tests
+        run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework ${{ matrix.framework }} --filter "Category=Portability"
+
+      - name: Run sample
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/run-sample.sh
+
+      - name: Audit dependencies
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/audit-dependencies.sh
+
+      - name: Validation pack
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: dotnet pack src/FriendlyEnvars/FriendlyEnvars.csproj --no-build --no-restore --configuration Release --output validation-pack
+
+      - name: Verify package
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/verify-package.sh validation-pack/FriendlyEnvars.2.0.0.nupkg validation-pack/FriendlyEnvars.2.0.0.snupkg
+
+      - name: Verify documentation
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/verify-docs.sh validation-pack/FriendlyEnvars.2.0.0.nupkg
+
+      - name: Verify API removals
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/verify-api-removals.sh
+
+      - name: Quick Start smoke consumer
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/smoke-consumer.sh validation-pack/FriendlyEnvars.2.0.0.nupkg
+
+      - name: Trim smoke
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/trim-smoke.sh
+
+  report-tests:
+    name: Report tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
         with:
           dotnet-version: ${{ env.DOTNET_SDK_VERSIONS }}
 
       - name: Restore
-        # Locked mode fails rather than resolving a version the committed packages.lock.json does not
-        # record, so a dependency cannot change in CI without the lock file change appearing in review.
         run: dotnet restore FriendlyEnvars.slnx --locked-mode
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release FriendlyEnvars.slnx
+        run: dotnet build FriendlyEnvars.slnx --no-restore --configuration Release
 
-      - name: Portability tests
-        run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework ${{ matrix.framework }} --filter 'Category=Portability'
+      - name: Test (net8.0)
+        run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework net8.0 --logger trx --results-directory TestResults
+
+      - name: Test (net10.0)
+        run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework net10.0 --logger trx --results-directory TestResults
+
+      - name: Publish test results
+        uses: dorny/test-reporter@7b7927aa7da8b82e81e755810cb51f39941a2cc7 # v2.2.0
+        if: always()
+        with:
+          name: Test Results
+          path: TestResults/*.trx
+          reporter: dotnet-trx
+
+  package:
+    name: Package
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: ${{ env.DOTNET_SDK_VERSIONS }}
+
+      - name: Restore
+        run: dotnet restore FriendlyEnvars.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build FriendlyEnvars.slnx --no-restore --configuration Release --warnaserror
+
+      - name: Pack
+        run: dotnet pack src/FriendlyEnvars/FriendlyEnvars.csproj --no-build --no-restore --configuration Release --output artifacts/release
+
+      - name: Restore tools
+        run: dotnet tool restore --configfile NuGet.config
+
+      - name: Generate SBOM
+        run: eng/generate-sbom.sh artifacts/release
+
+      - name: Verify SBOM
+        run: eng/verify-sbom.sh artifacts/release/sbom.spdx.json
+
+      - name: Checksums
+        run: |
+          set -euo pipefail
+          cd artifacts/release
+          shasum -a 256 FriendlyEnvars.2.0.0.nupkg FriendlyEnvars.2.0.0.snupkg sbom.spdx.json | sort -k2 > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Attest nupkg provenance
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-path: artifacts/release/FriendlyEnvars.2.0.0.nupkg
+
+      - name: Attest snupkg provenance
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-path: artifacts/release/FriendlyEnvars.2.0.0.snupkg
+
+      - name: Attest nupkg SBOM
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-path: artifacts/release/FriendlyEnvars.2.0.0.nupkg
+          sbom-path: artifacts/release/sbom.spdx.json
+
+      - name: Attest snupkg SBOM
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-path: artifacts/release/FriendlyEnvars.2.0.0.snupkg
+          sbom-path: artifacts/release/sbom.spdx.json
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: friendly-envars-2.0.0-${{ github.sha }}
+          path: |
+            artifacts/release/FriendlyEnvars.2.0.0.nupkg
+            artifacts/release/FriendlyEnvars.2.0.0.snupkg
+            artifacts/release/sbom.spdx.json
+            artifacts/release/SHA256SUMS
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: package
+    runs-on: ubuntu-latest
+    environment: nuget-production
+    permissions:
+      contents: read
+      attestations: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: ${{ env.DOTNET_SDK_VERSIONS }}
+
+      - name: Download release artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: friendly-envars-2.0.0-${{ github.sha }}
+          path: artifacts/release
+
+      - name: Build repository verifier
+        run: |
+          set -euo pipefail
+          dotnet restore eng/FriendlyEnvars.RepositoryVerifier/FriendlyEnvars.RepositoryVerifier.csproj --locked-mode
+          dotnet build eng/FriendlyEnvars.RepositoryVerifier/FriendlyEnvars.RepositoryVerifier.csproj --configuration Release --no-restore
+
+      - name: Verify checksums and attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cd artifacts/release
+          shasum -a 256 --check SHA256SUMS
+          cd "$GITHUB_WORKSPACE"
+          VERIFY_DIR="$(mktemp -d)"
+          for artifact in FriendlyEnvars.2.0.0.nupkg FriendlyEnvars.2.0.0.snupkg; do
+            gh attestation verify "artifacts/release/$artifact" \
+              --repo llepecki/friendly-envars \
+              --predicate-type https://slsa.dev/provenance/v1 \
+              --signer-workflow llepecki/friendly-envars/.github/workflows/ci.yml \
+              --source-ref refs/heads/master \
+              --source-digest "${{ github.sha }}" \
+              --format json > "$VERIFY_DIR/$artifact.provenance.json"
+            gh attestation verify "artifacts/release/$artifact" \
+              --repo llepecki/friendly-envars \
+              --predicate-type https://spdx.dev/Document/v2.3 \
+              --signer-workflow llepecki/friendly-envars/.github/workflows/ci.yml \
+              --source-ref refs/heads/master \
+              --source-digest "${{ github.sha }}" \
+              --format json > "$VERIFY_DIR/$artifact.sbom.json"
+            dotnet eng/FriendlyEnvars.RepositoryVerifier/bin/Release/net10.0/FriendlyEnvars.RepositoryVerifier.dll attestation \
+              --artifact "artifacts/release/$artifact" \
+              --provenance "$VERIFY_DIR/$artifact.provenance.json" \
+              --sbom-attestation "$VERIFY_DIR/$artifact.sbom.json" \
+              --checksums artifacts/release/SHA256SUMS \
+              --repository llepecki/friendly-envars \
+              --source-ref refs/heads/master \
+              --commit "${{ github.sha }}" \
+              --signer-workflow llepecki/friendly-envars/.github/workflows/ci.yml
+          done
+
+      - name: NuGet login
+        uses: NuGet/login@d22cc5f58ff5b88bf9bd452535b4335137e24544 # v1.1.0
+        id: nuget-login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push package
+        run: dotnet nuget push artifacts/release/FriendlyEnvars.2.0.0.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
