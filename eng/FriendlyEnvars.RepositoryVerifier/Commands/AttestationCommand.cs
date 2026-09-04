@@ -69,6 +69,12 @@ internal static class AttestationCommand
             $"SBOM attestation from {signerWorkflow}@{sourceRef} at {commit}.");
     }
 
+    /// <summary>
+    /// Parses and validates the complete SHA256SUMS file, not just the artifact's own line: every
+    /// entry must be well formed, filenames must be unique and sorted, and the file must hold exactly
+    /// the three release entries the contract fixes (both packages and the SBOM). A malformed file is
+    /// a controlled verification failure, never a crash.
+    /// </summary>
     private static void VerifyChecksumsEntry(string checksumsPath, string artifactName, string actualDigest, List<string> failures)
     {
         if (!File.Exists(checksumsPath))
@@ -77,15 +83,48 @@ internal static class AttestationCommand
             return;
         }
 
-        var entries = File.ReadAllLines(checksumsPath)
-            .Select(static line => line.Trim())
-            .Where(static line => line.Length > 0)
-            .Select(static line => line.Split((char[]?)null, 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            .Where(static parts => parts.Length == 2)
-            .ToDictionary(
-                static parts => parts[1].TrimStart('*'),
-                static parts => parts[0].ToLowerInvariant(),
-                StringComparer.Ordinal);
+        var entries = new Dictionary<string, string>(StringComparer.Ordinal);
+        var order = new List<string>();
+        int lineNumber = 0;
+
+        foreach (string rawLine in File.ReadAllLines(checksumsPath))
+        {
+            lineNumber++;
+            string line = rawLine.Trim();
+
+            if (line.Length == 0)
+            {
+                continue;
+            }
+
+            string[] parts = line.Split((char[]?)null, 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            if (parts.Length != 2 || parts[0].Length != 64 || !parts[0].All(Uri.IsHexDigit))
+            {
+                failures.Add($"'{checksumsPath}' line {lineNumber} is not a 'sha256  filename' entry: '{line}'");
+                continue;
+            }
+
+            string fileName = parts[1].TrimStart('*');
+
+            if (!entries.TryAdd(fileName, parts[0].ToLowerInvariant()))
+            {
+                failures.Add($"'{checksumsPath}' lists '{fileName}' more than once");
+                continue;
+            }
+
+            order.Add(fileName);
+        }
+
+        if (entries.Count != 3)
+        {
+            failures.Add($"'{checksumsPath}' holds {entries.Count} entr(ies); exactly 3 are required (both packages and the SBOM)");
+        }
+
+        if (!order.SequenceEqual(order.Order(StringComparer.Ordinal), StringComparer.Ordinal))
+        {
+            failures.Add($"'{checksumsPath}' entries are not sorted by filename: {string.Join(", ", order)}");
+        }
 
         if (!entries.TryGetValue(artifactName, out string? recorded))
         {

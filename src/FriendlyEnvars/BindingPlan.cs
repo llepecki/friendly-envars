@@ -100,53 +100,54 @@ internal sealed class BindingPlan
 
         foreach (var property in properties)
         {
-            CustomAttributeData? attributeData;
-
+            // The complete per-property inspection is wrapped: attribute discovery, decoding the
+            // attribute's constructor arguments, reading the property type and inspecting the setter
+            // all touch metadata that hostile or malformed IL can make throw, and a raw reflection
+            // exception here would escape the sanitized failure contract. Failures the inspection
+            // itself raises deliberately pass through unchanged.
             try
             {
-                attributeData = FindEnvarAttributeData(property);
+                CustomAttributeData? attributeData = FindEnvarAttributeData(property);
+
+                if (attributeData is null)
+                {
+                    continue;
+                }
+
+                planObserver.MetadataInspected(property);
+
+                var targetType = property.PropertyType;
+                string? environmentVariableName = DecodeEnvironmentVariableName(attributeData);
+
+                // Validate before using the name in diagnostics.
+                if (!EnvarAttribute.IsValidName(environmentVariableName))
+                {
+                    throw EnvarsException.InvalidAttributeName(optionsType, optionsName, property.Name, targetType);
+                }
+
+                if (!IsSupportedBindTarget(property))
+                {
+                    throw EnvarsException.InvalidPropertyShape(environmentVariableName, optionsType, optionsName, property.Name, targetType);
+                }
+
+                // Precompute before any environment read or service registration.
+                var conversion = DefaultEnvarPropertyBinder.PrecomputedConversion.Create(targetType, enumMetadataCache);
+
+                descriptors.Add(new PropertyDescriptor(property, environmentVariableName, targetType, conversion));
+            }
+            catch (EnvarsException)
+            {
+                throw;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 throw EnvarsException.PropertyMetadataFailure(
                     optionsType, optionsName, property.Name, SafePropertyType(property), EnvarsException.DescribeCause(ex));
             }
-
-            if (attributeData is null)
-            {
-                continue;
-            }
-
-            planObserver.MetadataInspected(property);
-
-            var targetType = property.PropertyType;
-            string? environmentVariableName = DecodeEnvironmentVariableName(attributeData);
-
-            // Validate before using the name in diagnostics.
-            if (!EnvarAttribute.IsValidName(environmentVariableName))
-            {
-                throw EnvarsException.InvalidAttributeName(optionsType, optionsName, property.Name, targetType);
-            }
-
-            if (!IsSupportedBindTarget(property))
-            {
-                throw EnvarsException.InvalidPropertyShape(environmentVariableName, optionsType, optionsName, property.Name, targetType);
-            }
-
-            DefaultEnvarPropertyBinder.PrecomputedConversion conversion;
-
-            try
-            {
-                // Precompute before any environment read or service registration.
-                conversion = DefaultEnvarPropertyBinder.PrecomputedConversion.Create(targetType, enumMetadataCache);
-            }
-            catch (Exception ex)
-            {
-                throw EnvarsException.PropertyMetadataFailure(
-                    optionsType, optionsName, property.Name, targetType, EnvarsException.DescribeCause(ex));
-            }
-
-            descriptors.Add(new PropertyDescriptor(property, environmentVariableName, targetType, conversion));
         }
 
         var entries = new BindingPlanEntry[descriptors.Count];
