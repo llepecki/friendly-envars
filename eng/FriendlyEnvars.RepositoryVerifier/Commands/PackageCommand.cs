@@ -25,6 +25,9 @@ internal static class PackageCommand
         string? projectFile = commandLine.GetOptional("project");
         string? expectedBaseline = commandLine.GetOptional("expect-validation-baseline");
         var expectedDependencies = commandLine.GetMany("expect-dependency");
+        var expectedMetadata = commandLine.GetMany("expect-metadata");
+        string? expectedRepositoryUrl = commandLine.GetOptional("expect-repository-url");
+        var expectedProperties = commandLine.GetMany("expect-property");
         commandLine.EnsureAllConsumed();
 
         using var package = NuGetPackage.Open(packagePath);
@@ -53,6 +56,22 @@ internal static class PackageCommand
             VerifyDependencies(package, expectedDependencies, failures);
         }
 
+        foreach (string expectation in expectedMetadata)
+        {
+            var (name, value) = SplitExpectation(expectation, "expect-metadata");
+            string? actual = package.GetMetadata(name);
+
+            if (!string.Equals(actual, value, StringComparison.Ordinal))
+            {
+                failures.Add($"<{name}> is '{actual ?? "<absent>"}', expected '{value}'");
+            }
+        }
+
+        if (expectedRepositoryUrl is not null)
+        {
+            VerifyRepository(package, expectedRepositoryUrl, failures);
+        }
+
         if (suppressionsFile is not null)
         {
             VerifySuppressions(suppressionsFile, failures);
@@ -60,7 +79,11 @@ internal static class PackageCommand
 
         if (projectFile is not null)
         {
-            VerifyProject(projectFile, expectedBaseline, suppressionsFile is null ? null : Path.GetFileName(suppressionsFile), failures);
+            VerifyProject(projectFile, expectedBaseline, suppressionsFile is null ? null : Path.GetFileName(suppressionsFile), expectedProperties, failures);
+        }
+        else if (expectedProperties.Count > 0)
+        {
+            failures.Add("--expect-property requires --project");
         }
 
         if (failures.Count > 0)
@@ -71,6 +94,51 @@ internal static class PackageCommand
         }
 
         Console.WriteLine($"package OK: '{packagePath}' is {expectedId} {expectedVersion} with all declared metadata assets present.");
+    }
+
+    /// <summary>Splits a repeatable "name=value" expectation, failing loudly on a malformed one.</summary>
+    private static (string Name, string Value) SplitExpectation(string expectation, string optionName)
+    {
+        int separator = expectation.IndexOf('=', StringComparison.Ordinal);
+
+        if (separator <= 0 || separator == expectation.Length - 1)
+        {
+            throw new VerificationException($"--{optionName} '{expectation}' is not of the form name=value.");
+        }
+
+        return (expectation[..separator], expectation[(separator + 1)..]);
+    }
+
+    /// <summary>
+    /// Verifies the nuspec's &lt;repository&gt; element: the expected URL and a 40-hex commit, which is
+    /// what lets a consumer trace the package back to the exact tree it was built from.
+    /// </summary>
+    private static void VerifyRepository(NuGetPackage package, string expectedUrl, List<string> failures)
+    {
+        var repositories = package.Metadata
+            .Elements()
+            .Where(static element => element.Name.LocalName == "repository")
+            .ToArray();
+
+        if (repositories.Length != 1)
+        {
+            failures.Add($"the .nuspec declares {repositories.Length} <repository> elements; exactly 1 is required");
+            return;
+        }
+
+        string? url = repositories[0].Attribute("url")?.Value;
+
+        if (!string.Equals(url, expectedUrl, StringComparison.Ordinal))
+        {
+            failures.Add($"<repository> url is '{url ?? "<absent>"}', expected '{expectedUrl}'");
+        }
+
+        string? commit = repositories[0].Attribute("commit")?.Value;
+
+        if (commit is null || commit.Length != 40 || !commit.All(static character => Uri.IsHexDigit(character)))
+        {
+            failures.Add($"<repository> commit is '{commit ?? "<absent>"}', expected a 40-character commit SHA");
+        }
     }
 
     /// <summary>
@@ -175,7 +243,7 @@ internal static class PackageCommand
     /// Checks the packaging properties that decide whether validation runs at all, and that no
     /// compatibility diagnostic has been silenced through NoWarn.
     /// </summary>
-    private static void VerifyProject(string projectFile, string? expectedBaseline, string? suppressionsFileName, List<string> failures)
+    private static void VerifyProject(string projectFile, string? expectedBaseline, string? suppressionsFileName, IReadOnlyList<string> expectedProperties, List<string> failures)
     {
         if (!File.Exists(projectFile))
         {
@@ -220,6 +288,17 @@ internal static class PackageCommand
         if (!string.Equals(Property("EnablePackageValidation"), "true", StringComparison.OrdinalIgnoreCase))
         {
             failures.Add("<EnablePackageValidation> is not set to true");
+        }
+
+        foreach (string expectation in expectedProperties)
+        {
+            var (name, value) = SplitExpectation(expectation, "expect-property");
+            string? actual = Property(name);
+
+            if (!string.Equals(actual, value, StringComparison.Ordinal))
+            {
+                failures.Add($"<{name}> is '{actual ?? "<absent>"}', expected '{value}'");
+            }
         }
 
         if (expectedBaseline is not null &&

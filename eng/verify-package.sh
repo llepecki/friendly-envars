@@ -79,7 +79,15 @@ run_verifier package \
     --project "$REPO_ROOT/src/FriendlyEnvars/FriendlyEnvars.csproj" \
     --expect-validation-baseline "1.1.0" \
     --suppressions-file "$REPO_ROOT/src/FriendlyEnvars/CompatibilitySuppressions.xml" \
-    --expect-dependency "Microsoft.Extensions.Options"
+    --expect-dependency "Microsoft.Extensions.Options" \
+    --expect-metadata "copyright=Copyright (c) 2026 Lukasz Lepecki" \
+    --expect-repository-url "https://github.com/llepecki/friendly-envars" \
+    --expect-property "Deterministic=true" \
+    --expect-property "ContinuousIntegrationBuild=true" \
+    --expect-property "PublishRepositoryUrl=true" \
+    --expect-property "EmbedUntrackedSources=true" \
+    --expect-property "IncludeSymbols=true" \
+    --expect-property "SymbolPackageFormat=snupkg"
 
 run_verifier package-manifest \
     --package "$NUPKG" \
@@ -87,5 +95,12 @@ run_verifier package-manifest \
     --require "/README.md" \
     --require "/lib/net8.0/FriendlyEnvars.dll" \
     --require "/lib/net8.0/FriendlyEnvars.xml"
+
+if [[ -n "$SNUPKG" ]]; then
+    # The symbol package must actually carry the symbols its name promises.
+    run_verifier package-manifest \
+        --package "$SNUPKG" \
+        --require "/lib/net8.0/FriendlyEnvars.pdb"
+fi
 
 echo "verify-package: OK"

@@ -68,6 +68,18 @@ internal static class Program
                     ApiRemovalsCommand.Run(commandLine);
                     break;
 
+                case "sourcelink":
+                    SourceLinkCommand.Run(commandLine);
+                    break;
+
+                case "reproducible-package":
+                    PackageCompareCommand.Run(commandLine, exemptRepositorySignature: false);
+                    break;
+
+                case "published-package":
+                    PackageCompareCommand.Run(commandLine, exemptRepositorySignature: true);
+                    break;
+
                 default:
                     throw new VerificationException(
                         Array.IndexOf(KnownSubcommands, subcommand) >= 0

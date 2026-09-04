@@ -13,6 +13,21 @@
         <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
     </PropertyGroup>
     <PropertyGroup>
+        <!--
+          Deterministic, source-linked release artifacts. ContinuousIntegrationBuild is unconditional
+          rather than gated on a CI variable: eng/verify-reproducible-package.sh builds the same commit
+          in two different directories and requires byte-identical packages, which only holds when
+          source paths are normalised everywhere, and eng/verify-package.sh audits these properties and
+          rejects a conditional declaration because its effective value cannot be read from the file.
+        -->
+        <Deterministic>true</Deterministic>
+        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    </PropertyGroup>
+    <PropertyGroup>
         <PackageId>FriendlyEnvars</PackageId>
         <VersionPrefix>2.0.0</VersionPrefix>
         <PackageReleaseNotes>
@@ -61,7 +76,7 @@
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageTags>configuration;options;environment-variables</PackageTags>
-        <Copyright>Copyright (c) 2025 Lukasz Lepecki</Copyright>
+        <Copyright>Copyright (c) 2026 Lukasz Lepecki</Copyright>
         <PackageProjectUrl>https://github.com/llepecki/friendly-envars</PackageProjectUrl>
         <RepositoryUrl>https://github.com/llepecki/friendly-envars</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
@@ -95,6 +110,10 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Nullable.Extended.Analyzer" Version="1.15.6581">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
