@@ -23,6 +23,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # eng/secret-scan.sh scans the full history across all refs, which a shallow clone
+          # cannot provide.
+          fetch-depth: 0
+
+      - name: Secret scan
+        run: eng/secret-scan.sh
 
       - name: Set Version Suffix
         id: version

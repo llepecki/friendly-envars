@@ -250,12 +250,16 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 
-public record ConnectionString
+// A class rather than a record: a record's compiler-generated ToString prints every property, so a
+// logged ConnectionString would print the password. The override keeps accidental logging safe.
+public sealed class ConnectionString
 {
     public string Host { get; init; } = string.Empty;
     public int Port { get; init; }
     public string User { get; init; } = string.Empty;
     public string Password { get; init; } = string.Empty;
+
+    public override string ToString() => $"Host={Host};Port={Port};User={User};Password=<redacted>";
 }
 
 public class CustomEnvarPropertyBinder : IEnvarPropertyBinder
@@ -300,7 +304,7 @@ public class CustomEnvarPropertyBinder : IEnvarPropertyBinder
 Usage with environment variable `CONNECTION_STRING=Host=localhost;Port=5432;User=Joe;Password=Joe12`:
 
 ```csharp
-public record DatabaseSettings
+public class DatabaseSettings
 {
     [Envar("CONNECTION_STRING")]
     public ConnectionString Connection { get; init; } = new();
