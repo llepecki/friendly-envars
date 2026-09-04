@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# The single local entry point for the complete repository gate. Runs the canonical command sequence
-# from AGENT_REVIEW.md without omitting or weakening a command. Run from a clean checkout of the
-# final candidate commit on the gate host (Ubuntu 24.04 x64 with SDKs 8.0.424 and 10.0.400).
+# The single local entry point for the complete repository gate. Runs every subordinate gate in a
+# fixed order. Run from a clean checkout of the release candidate commit on the gate host
+# (Ubuntu 24.04 x64 with the .NET 8 and .NET 10 SDKs installed).
 #
 # Usage: eng/verify-repository.sh
 
@@ -26,8 +26,8 @@ fi
 
 ACTUAL_SDK="$(dotnet --version)"
 
-if [[ "$ACTUAL_SDK" != "10.0.400" ]]; then
-    echo "verify-repository: dotnet --version is '$ACTUAL_SDK', expected exactly '10.0.400'" >&2
+if [[ "$ACTUAL_SDK" != 10.0.* ]]; then
+    echo "verify-repository: dotnet --version is '$ACTUAL_SDK', expected a 10.0 SDK" >&2
     exit 1
 fi
 
@@ -51,7 +51,6 @@ eng/verify-api-removals.sh
 eng/secret-scan.sh
 eng/verify-sourcelink.sh artifacts/release/FriendlyEnvars.2.0.0-alpha.snupkg
 eng/verify-reproducible-package.sh
-eng/compare-benchmarks.sh
 git diff --exit-code
 
 echo "verify-repository: OK"

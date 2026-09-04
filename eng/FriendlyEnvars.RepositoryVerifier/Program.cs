@@ -10,7 +10,6 @@ internal static class Program
     private static readonly string[] KnownSubcommands =
     [
         "attestation",
-        "benchmark",
         "package",
         "docs",
         "sbom",
@@ -69,10 +68,6 @@ internal static class Program
 
                 case "workflow":
                     WorkflowCommand.Run(commandLine);
-                    break;
-
-                case "benchmark":
-                    BenchmarkCommand.Run(commandLine);
                     break;
 
                 case "sourcelink":

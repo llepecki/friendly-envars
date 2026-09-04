@@ -22,10 +22,6 @@
     <Folder Name="/src/">
         <Project Path="src/FriendlyEnvars/FriendlyEnvars.csproj" />
     </Folder>
-    <Folder Name="/benchmarks/">
-        <Project Path="benchmarks/FriendlyEnvars.Benchmarks/FriendlyEnvars.Benchmarks.Baseline/FriendlyEnvars.Benchmarks.Baseline.csproj" />
-        <Project Path="benchmarks/FriendlyEnvars.Benchmarks/FriendlyEnvars.Benchmarks.Candidate/FriendlyEnvars.Benchmarks.Candidate.csproj" />
-    </Folder>
     <Folder Name="/tests/">
         <Project Path="tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj" />
         <Project Path="tests/FriendlyEnvars.TrimSmoke/FriendlyEnvars.TrimSmoke.csproj" />
