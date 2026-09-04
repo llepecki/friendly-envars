@@ -32,17 +32,76 @@ Do you need to configure your .NET app *purely* via environment variables?
 
 ## 🚀 Quick Start
 
-### 1. Define Your Configuration Class
+Everything in this section is executable exactly as written. `eng/smoke-consumer.sh` creates empty
+console projects for both supported targets, runs the commands below, copies the two programs below into
+them and runs those too, so a Quick Start that stops working stops the build.
 
-Annotate properties you want loaded from environment variables. Properties must have a setter (`set` or `init`):
+Two things are worth knowing before you start. Conversion from environment text to your property types
+is automatic - you do not write any parsing. Data-annotation validation is opt-in: it comes from the
+companion `Microsoft.Extensions.Options.DataAnnotations` package and runs only where you call
+`ValidateDataAnnotations()`.
 
+### 1. Create a project and add the packages
+
+`Microsoft.Extensions.Hosting` brings in the dependency-injection and options assemblies, so there is no
+need to add `Microsoft.Extensions.DependencyInjection` or `Microsoft.Extensions.Options` yourself.
+
+On .NET 8:
+
+<!-- smoke-consumer: packages net8.0 -->
+```bash
+dotnet new console --framework net8.0 --output quickstart
+cd quickstart
+dotnet add package FriendlyEnvars --version 2.0.0
+dotnet add package Microsoft.Extensions.Hosting --version 8.0.1
+dotnet add package Microsoft.Extensions.Options.DataAnnotations --version 8.0.0
+```
+
+On .NET 10:
+
+<!-- smoke-consumer: packages net10.0 -->
+```bash
+dotnet new console --framework net10.0 --output quickstart
+cd quickstart
+dotnet add package FriendlyEnvars --version 2.0.0
+dotnet add package Microsoft.Extensions.Hosting --version 10.0.11
+dotnet add package Microsoft.Extensions.Options.DataAnnotations --version 10.0.11
+```
+
+### 2. Set the environment variables
+
+<!-- smoke-consumer: environment valid -->
+```bash
+export DB_HOST=db.internal
+export DB_PORT=5432
+export DB_SSL_ENABLED=true
+export DB_CONNECTION_TIMEOUT=00:00:45
+```
+
+### 3. Write the program
+
+Replace the generated `Program.cs` with this. It is a complete file: the `using` directives, the options
+type, the registration, and a host that starts, resolves the options and stops.
+
+<!-- smoke-consumer: program valid -->
 ```csharp
-public record DatabaseSettings
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.Threading;
+using System.Threading.Tasks;
+using FriendlyEnvars;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+
+public sealed record DatabaseSettings
 {
     [Envar("DB_HOST")]
+    [Required]
     public string Host { get; init; } = string.Empty;
 
     [Envar("DB_PORT")]
+    [Range(1, 65535)]
     public int Port { get; init; }
 
     [Envar("DB_SSL_ENABLED")]
@@ -51,41 +110,104 @@ public record DatabaseSettings
     [Envar("DB_CONNECTION_TIMEOUT")]
     public TimeSpan ConnectionTimeout { get; init; } = TimeSpan.FromSeconds(30);
 }
-```
 
-### 2. Register in DI
-
-Hook up configuration binding in your Startup.cs or DI setup:
-
-```csharp
-services
-    .AddOptions<DatabaseSettings>()
-    .BindEnvars();
-```
-
-### 3. Add Validation (Optional)
-
-Validate environment variables using standard data annotation attributes:
-
-```csharp
-services
-    .AddOptions<DatabaseSettings>()
-    .BindEnvars()
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
-```
-
-### 4. Inject and Use Your Config
-
-```csharp
-public class MyService
+public static class Program
 {
-    public MyService(IOptions<DatabaseSettings> settings)
+    public static async Task Main()
     {
-        var dbSettings = settings.Value;
+        HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+
+        builder.Services
+            .AddOptions<DatabaseSettings>()
+            .BindEnvars()
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        using IHost host = builder.Build();
+
+        await host.StartAsync(CancellationToken.None);
+
+        DatabaseSettings settings = host.Services.GetRequiredService<IOptions<DatabaseSettings>>().Value;
+
+        Console.WriteLine($"host={settings.Host}");
+        Console.WriteLine($"port={settings.Port}");
+        Console.WriteLine($"ssl={settings.SslEnabled}");
+        Console.WriteLine($"timeout={settings.ConnectionTimeout}");
+
+        await host.StopAsync(CancellationToken.None);
     }
 }
 ```
+
+`dotnet run` prints:
+
+<!-- smoke-consumer: output valid -->
+```text
+host=db.internal
+port=5432
+ssl=True
+timeout=00:00:45
+```
+
+### 4. What a value that fails validation does
+
+This is a separate, self-contained program. It sets an out-of-range port itself so you can run it
+without changing your environment, and it deliberately does not catch the failure.
+
+<!-- smoke-consumer: program invalid -->
+```csharp
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.Threading;
+using System.Threading.Tasks;
+using FriendlyEnvars;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+public sealed record PortSettings
+{
+    // The default is deliberately in range, so the start-up failure below can only come from the
+    // captured environment value.
+    [Envar("DB_PORT")]
+    [Range(1, 65535)]
+    public int Port { get; init; } = 5432;
+}
+
+public static class Program
+{
+    public static async Task Main()
+    {
+        // 70000 is outside the Range above. Values are captured once, while BindEnvars runs, so this
+        // has to be set before the host is built.
+        Environment.SetEnvironmentVariable("DB_PORT", "70000");
+
+        HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+
+        builder.Services
+            .AddOptions<PortSettings>()
+            .BindEnvars()
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        using IHost host = builder.Build();
+
+        // ValidateOnStart runs the annotations here, so the application fails to start rather than
+        // running with a port it cannot use.
+        await host.StartAsync(CancellationToken.None);
+    }
+}
+```
+
+It exits with a nonzero code. This line of its output is the failure - the full output also carries
+the stack trace and the host's own "Hosting failed to start" logging:
+
+<!-- smoke-consumer: output invalid -->
+```text
+Unhandled exception. Microsoft.Extensions.Options.OptionsValidationException: DataAnnotation validation failed for 'PortSettings' members: 'Port' with the error: 'The field Port must be between 1 and 65535.'.
+```
+
+Without the `ValidateDataAnnotations()` call the same program starts normally and uses the out-of-range
+value, which is what "opt-in" means here.
 
 ### 💡 Features
 
