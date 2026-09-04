@@ -15,16 +15,7 @@ public abstract class EnvarTestsBase : IDisposable
         _environmentVariablesToCleanup.Add(name);
     }
 
-    /// <summary>
-    /// Registers <typeparamref name="T"/> against an explicit set of captured environment values rather
-    /// than the process environment.
-    /// </summary>
-    /// <remarks>
-    /// Required for any test that needs an intentionally empty value: on net8.0
-    /// <see cref="Environment.SetEnvironmentVariable(string, string)"/> with an empty value deletes the
-    /// variable instead of emptying it, whereas net10.0 stores a real empty value. Going through the
-    /// reader seam makes the scenario expressible identically on every supported target framework.
-    /// </remarks>
+    // Explicit values preserve empty strings consistently across target frameworks.
     protected static OptionsBuilder<T> BindCapturedEnvironment<T>(
         IServiceCollection services,
         Dictionary<string, string?> capturedValues,

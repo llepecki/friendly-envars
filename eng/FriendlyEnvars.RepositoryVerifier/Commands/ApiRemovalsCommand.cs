@@ -7,10 +7,6 @@ using System.Xml.Linq;
 
 namespace FriendlyEnvars.RepositoryVerifier.Commands;
 
-/// <summary>
-/// Implements the scoped removal search: the named identifiers must appear nowhere in the searched
-/// source paths, nowhere in the package release notes, and nowhere on the compiled public surface.
-/// </summary>
 internal static class ApiRemovalsCommand
 {
     private static readonly string[] SearchedExtensions =

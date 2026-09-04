@@ -6,10 +6,6 @@ using Xunit;
 
 namespace FriendlyEnvars.Tests;
 
-/// <summary>
-/// What a registration puts into the service collection, and what happens when the same
-/// <c>(options type, options name)</c> pair is registered twice.
-/// </summary>
 public class RegistrationTests : EnvarTestsBase
 {
     public class TestOptions

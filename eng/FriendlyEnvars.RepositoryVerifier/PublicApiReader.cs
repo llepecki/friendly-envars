@@ -7,12 +7,6 @@ using System.Reflection.PortableExecutable;
 
 namespace FriendlyEnvars.RepositoryVerifier;
 
-/// <summary>
-/// Describes one member of a compiled assembly's public surface.
-/// </summary>
-/// <param name="DeclaringType">Namespace-qualified type name, using '+' for nested types.</param>
-/// <param name="Kind">"type", "method", "property", "field" or "event".</param>
-/// <param name="Name">The member's metadata name; equal to the type name when <paramref name="Kind"/> is "type".</param>
 internal readonly record struct PublicMember(string DeclaringType, string Kind, string Name)
 {
     public override string ToString()
@@ -21,11 +15,6 @@ internal readonly record struct PublicMember(string DeclaringType, string Kind, 
     }
 }
 
-/// <summary>
-/// Reads an assembly's externally visible surface straight from its ECMA-335 metadata. This inspects the
-/// real compiled output rather than its source text, and uses only in-box APIs so the verifier keeps its
-/// single-third-party-dependency budget.
-/// </summary>
 internal sealed class PublicApiReader : IDisposable
 {
     private readonly PEReader _peReader;
@@ -69,11 +58,6 @@ internal sealed class PublicApiReader : IDisposable
         return Open(File.OpenRead(path), path);
     }
 
-    /// <summary>
-    /// Enumerates every externally visible type and its externally visible members. Visibility follows the
-    /// language rules: a nested type is only visible when its whole enclosing chain is visible, and
-    /// private/internal members are excluded because they are not part of the shipped contract.
-    /// </summary>
     public IEnumerable<PublicMember> EnumeratePublicMembers()
     {
         foreach (var handle in _metadata.TypeDefinitions)

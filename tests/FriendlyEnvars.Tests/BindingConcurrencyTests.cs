@@ -10,22 +10,9 @@ using Xunit;
 
 namespace FriendlyEnvars.Tests;
 
-/// <summary>
-/// Proves that discovery happens exactly once per registration rather than lazily under contention, and
-/// that the library does not serialise calls into a caller's binder.
-/// </summary>
-/// <remarks>
-/// The previous design built metadata lazily into a process-wide cache, so the first concurrent burst of
-/// option creations raced to populate it. Building the plan eagerly during <c>BindEnvars</c> removes the
-/// race entirely: by the time any options instance can be created there is nothing left to construct.
-/// </remarks>
 public class BindingConcurrencyTests : EnvarTestsBase
 {
-    // The barrier tests deliberately cover IOptionsFactory and IOptionsSnapshot but NOT
-    // IOptionsMonitor. Microsoft's singleton IOptionsMonitorCache<T> serialises creation through an
-    // ExecutionAndPublication Lazy<T>, so a barrier across concurrent monitor reads could never release.
-    // That is a property of Microsoft.Extensions.Options, not of this library; extending these tests to
-    // the monitor would produce a false 30-second failure.
+    // IOptionsMonitor serializes creation, so it cannot participate in these barrier tests.
     private const int Participants = 32;
 
     private static readonly TimeSpan BarrierTimeout = TimeSpan.FromSeconds(30);
@@ -78,11 +65,6 @@ public class BindingConcurrencyTests : EnvarTestsBase
         }
     }
 
-    /// <summary>
-    /// Counts conversions, and makes every participant rendezvous inside <c>Convert</c>. If the library
-    /// serialised calls into the binder, only one participant could ever be inside it and the barrier
-    /// would time out instead of releasing.
-    /// </summary>
     private sealed class RendezvousBinder : IEnvarPropertyBinder
     {
         private readonly Barrier _barrier;
@@ -124,10 +106,7 @@ public class BindingConcurrencyTests : EnvarTestsBase
         }
     }
 
-    /// <summary>
-    /// Runs <paramref name="action"/> on dedicated threads. Dedicated threads rather than the thread pool,
-    /// because a barrier across pool work items can deadlock if the pool declines to grow.
-    /// </summary>
+    // Dedicated threads prevent thread-pool starvation at the barrier.
     private static void RunConcurrently(int participants, Action<int> action)
     {
         var threads = new Thread[participants];
@@ -266,8 +245,7 @@ public class BindingConcurrencyTests : EnvarTestsBase
 
         RunConcurrently(Participants, _ => factory.Create(Options.DefaultName));
 
-        // Exactly one conversion per created instance: the library neither caches conversions nor
-        // repeats them, and it does not create a binder per instance.
+        // Each instance converts once through the shared binder.
         Assert.Equal(Participants, binder.ConversionCount);
     }
 
@@ -279,8 +257,7 @@ public class BindingConcurrencyTests : EnvarTestsBase
         var observers = new RecordingObserver[Participants];
         var collections = new ServiceCollection[Participants];
 
-        // Registration itself is not required to be thread-safe against the SAME collection, so each
-        // participant builds its own; what is asserted is that each performs exactly one discovery.
+        // Each participant uses its own collection; registration is not concurrently shared.
         RunConcurrently(Participants, index =>
         {
             observers[index] = new RecordingObserver();

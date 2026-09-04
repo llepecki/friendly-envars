@@ -11,33 +11,14 @@ using Xunit;
 
 namespace FriendlyEnvars.Tests;
 
-/// <summary>
-/// Proves the library keeps no process-wide state that could root an options type, by loading options
-/// types into collectible <see cref="AssemblyLoadContext"/>s, binding through them, and requiring the
-/// contexts to be collected afterwards.
-/// </summary>
-/// <remarks>
-/// This is what the removed process-wide metadata cache made impossible: keying a static dictionary by
-/// <see cref="Type"/> pins the type, its assembly and its load context for the life of the process, so a
-/// plugin host that loads and unloads assemblies leaks one context per generation.
-/// </remarks>
 public class AssemblyUnloadTests
 {
-    /// <summary>
-    /// Bound inside a collectible context. Loaded by name from a second copy of this test assembly, so
-    /// the <see cref="Type"/> the library sees belongs to that context and not to the default one.
-    /// </summary>
     public class UnloadableOptions
     {
         [Envar("M07_VALUE")]
         public string Value { get; set; } = "default";
     }
 
-    /// <summary>
-    /// Loads a fresh copy of this assembly into a collectible context, registers and resolves the options
-    /// type from it, then unloads. Returns only weak references, so nothing here can keep the context
-    /// alive through the caller's stack.
-    /// </summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static (WeakReference Context, WeakReference OptionsType, string BoundValue) BindInCollectibleContext(int generation)
     {
@@ -90,8 +71,7 @@ public class AssemblyUnloadTests
 
     private static bool CollectUntilDead(params WeakReference[] references)
     {
-        // Unloading is asynchronous: the context dies only once every reference to anything inside it is
-        // gone and the finalizer queue has drained.
+        // Unloading completes after references and the finalizer queue are cleared.
         for (int attempt = 0; attempt < 20; attempt++)
         {
             if (references.All(static reference => !reference.IsAlive))
@@ -163,8 +143,7 @@ public class AssemblyUnloadTests
     [Fact]
     public void TheLibraryHoldsNoStaticCollectionOrReflectionHandle()
     {
-        // A stronger form of "repository search finds no static cache": this inspects the compiled
-        // assembly, so it also catches a cache introduced through a compiler-generated or nested type.
+        // Inspect binaries to catch static caches in generated or nested types.
         var offenders = new List<string>();
 
         foreach (var type in typeof(EnvarsException).Assembly.GetTypes())
@@ -213,8 +192,7 @@ public class AssemblyUnloadTests
             return true;
         }
 
-        // A delegate's signature may legitimately mention Type; only stored state matters, and that is
-        // checked by value above.
+        // Delegate signatures may mention Type; only stored state can root it.
         return type.IsGenericType
             && !typeof(Delegate).IsAssignableFrom(type)
             && type.GetGenericArguments().Any(MentionsForbiddenType);

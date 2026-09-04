@@ -1,19 +1,6 @@
 #!/usr/bin/env bash
-#
-# Verifies the Source Link contract of the symbol package: every compiled document maps to a URL that
-# pins the exact commit being released, the mapped URLs really serve the compiled content, and the
-# working tree the package was built from matches the PDB checksums.
-#
-# Run only from a clean checkout of the final committed release SHA, after that SHA has been pushed:
-# the remote leg fetches raw.githubusercontent.com content for HEAD, which exists only once pushed.
-#
-# The specified Source Link CLI (`dotnet sourcelink test`) is not used: no Source Link tool exists at
-# the pinned version on nuget.org, the only package source this repository permits. The repository
-# verifier's `sourcelink` subcommand performs the same document-by-document checks (URL pinning plus
-# checksum comparison of fetched content) with in-box metadata APIs. This deviation is recorded in the
-# REV-L06 handoff.
-#
-# Usage: eng/verify-sourcelink.sh <snupkg>
+# Verify Source Link URLs and checksums. Run after pushing the clean release commit.
+# Uses the repository verifier because the pinned Source Link CLI is unavailable on nuget.org.
 
 set -euo pipefail
 
@@ -21,10 +8,7 @@ REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 VERIFIER_PROJECT="$REPO_ROOT/eng/FriendlyEnvars.RepositoryVerifier/FriendlyEnvars.RepositoryVerifier.csproj"
 VERIFIER_DLL="$REPO_ROOT/eng/FriendlyEnvars.RepositoryVerifier/bin/Release/net10.0/FriendlyEnvars.RepositoryVerifier.dll"
 
-# Launches the verifier assembly directly through the muxer. `dotnet run` is deliberately avoided: it
-# re-evaluates the project, and when the wrapper's resolved repository path differs from the one the
-# solution build used (for example /private/var vs /var on macOS) MSBuild's incremental clean deletes
-# the runtime configuration out from under the run.
+# Avoid `dotnet run`; path aliases can trigger an incremental clean before execution.
 run_verifier() {
     if [[ ! -f "$VERIFIER_DLL" ]]; then
         dotnet build "$VERIFIER_PROJECT" --configuration Release --verbosity quiet --nologo >&2

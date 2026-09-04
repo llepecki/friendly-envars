@@ -5,21 +5,11 @@ using Xunit;
 
 namespace FriendlyEnvars.Tests;
 
-/// <summary>
-/// Covers which decorated property shapes are accepted as bind targets, and proves that an unsupported
-/// shape is rejected while <c>BindEnvars</c> runs rather than lazily when options are first created.
-/// </summary>
-/// <remarks>
-/// Every rejection case is asserted for all three states the environment variable can be in - missing,
-/// intentionally empty, and populated - because the shape is a property of the type, not of the
-/// environment. The captured-environment seam is used so an empty value is expressible identically on
-/// every supported target framework.
-/// </remarks>
 public class PropertyAccessibilityTests : EnvarTestsBase
 {
     private const string VariableName = "M01_VALUE";
 
-    // ----- Unsupported shapes -----
+    // Unsupported shapes.
 
     public class GetterOnlyOptions
     {
@@ -61,7 +51,7 @@ public class PropertyAccessibilityTests : EnvarTestsBase
         }
     }
 
-    // ----- Supported shapes -----
+    // Supported shapes.
 
     public class PublicSetOptions
     {
@@ -108,7 +98,7 @@ public class PropertyAccessibilityTests : EnvarTestsBase
 
         public string WithoutAttribute { get; set; } = "DefaultUnchanged";
 
-        // Undecorated shapes that would be rejected if they were decorated must simply be ignored.
+        // Ignore unsupported shapes when they are not decorated.
         public string GetterOnly { get; } = "ignored";
 
         public static string Static { get; set; } = "ignored";
@@ -130,7 +120,7 @@ public class PropertyAccessibilityTests : EnvarTestsBase
         Assert.Null(exception.CauseType);
         Assert.Null(exception.InnerException);
 
-        // The failure never mentions the value, whatever the value happened to be.
+        // Never disclose the value.
         if (!string.IsNullOrEmpty(capturedValue))
         {
             Assert.DoesNotContain(capturedValue, exception.Message, System.StringComparison.Ordinal);
@@ -187,7 +177,7 @@ public class PropertyAccessibilityTests : EnvarTestsBase
     {
         AssertShapeRejected<StaticPropertyOptions>(capturedValue, nameof(StaticPropertyOptions.Value));
 
-        // Assigning a static property would mutate state shared by every options instance.
+        // Static assignment would mutate shared state.
         Assert.Equal("untouched", StaticPropertyOptions.Value);
     }
 
@@ -197,7 +187,7 @@ public class PropertyAccessibilityTests : EnvarTestsBase
     [InlineData("populated")]
     public void Indexer_IsRejected(string? capturedValue)
     {
-        // The compiler names an indexer "Item" unless [IndexerName] says otherwise.
+        // Indexers default to the metadata name "Item".
         AssertShapeRejected<IndexerOptions>(capturedValue, "Item");
     }
 
@@ -226,7 +216,7 @@ public class PropertyAccessibilityTests : EnvarTestsBase
     [Fact]
     public void PublicSetterWithANonPublicGetter_Binds()
     {
-        // Only the set accessor's visibility is part of the rule.
+        // Only setter visibility controls writability.
         var services = new ServiceCollection();
         BindCapturedEnvironment<PrivateGetPublicSetOptions>(services, new Dictionary<string, string?> { [VariableName] = "bound" });
 

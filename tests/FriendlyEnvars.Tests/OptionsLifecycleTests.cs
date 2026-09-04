@@ -9,10 +9,6 @@ using Xunit;
 
 namespace FriendlyEnvars.Tests;
 
-/// <summary>
-/// Proves that each <c>BindEnvars</c> call takes exactly one snapshot of the environment, and that every
-/// options instance it later produces is built from that snapshot rather than from the live environment.
-/// </summary>
 public class OptionsLifecycleTests : EnvarTestsBase
 {
     public class TwoValueOptions
@@ -58,7 +54,6 @@ public class OptionsLifecycleTests : EnvarTestsBase
         public string Value { get; set; } = string.Empty;
     }
 
-    /// <summary>Records every read so both the count and the order can be asserted.</summary>
     private sealed class RecordingReader : IEnvironmentVariableReader
     {
         private readonly Dictionary<string, string?> _values;
@@ -92,7 +87,6 @@ public class OptionsLifecycleTests : EnvarTestsBase
         }
     }
 
-    /// <summary>Fails the read of one specific variable, leaving the others readable.</summary>
     private sealed class FailingReader : IEnvironmentVariableReader
     {
         private readonly string _failOn;
@@ -139,7 +133,6 @@ public class OptionsLifecycleTests : EnvarTestsBase
         }
     }
 
-    /// <summary>Returns a brand new mutable object on every call, and counts the calls.</summary>
     private sealed class FreshPayloadBinder : IEnvarPropertyBinder
     {
         public int ConvertCount { get; private set; }
@@ -234,9 +227,7 @@ public class OptionsLifecycleTests : EnvarTestsBase
         Assert.Equal("H03_UNSUPPORTED", exception.EnvironmentVariableName);
         Assert.Equal(nameof(MixedShapeOptions.Unsupported), exception.PropertyName);
 
-        // Every selected property is validated before any environment variable is read, so a malformed
-        // options type is rejected without the environment having been touched at all - including the
-        // variable belonging to the property that precedes the offending one.
+        // Validate every property before reading any variable.
         Assert.Empty(reader.Reads);
         Assert.Equal(descriptorCountBeforeBind, services.Count);
         Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IConfigureOptions<MixedShapeOptions>));
@@ -254,7 +245,7 @@ public class OptionsLifecycleTests : EnvarTestsBase
         var exception = Assert.Throws<EnvarsException>(
             () => OptionsBuilderExtensions.BindEnvarsCore(builder, null, reader, NullBindingPlanObserver.Instance));
 
-        // Properties up to and including the failing one were read once each; later ones were not read.
+        // Reading stops at the first failure.
         Assert.Equal(["H03_FIRST", "H03_SECOND"], reader.Reads);
 
         Assert.Equal(EnvarFailureKind.EnvironmentRead, exception.FailureKind);
@@ -283,7 +274,7 @@ public class OptionsLifecycleTests : EnvarTestsBase
         var thrown = Assert.Throws<OperationCanceledException>(
             () => OptionsBuilderExtensions.BindEnvarsCore(builder, null, reader, NullBindingPlanObserver.Instance));
 
-        // Reference-equivalent and unwrapped: cancellation is the caller's control flow, not a failure.
+        // Cancellation remains unwrapped and reference-equal.
         Assert.Same(cancellation, thrown);
 
         Assert.Equal(["H03_FIRST", "H03_SECOND"], reader.Reads);
@@ -316,8 +307,7 @@ public class OptionsLifecycleTests : EnvarTestsBase
             Assert.Equal("captured", scope.ServiceProvider.GetRequiredService<IOptionsSnapshot<StringOptions>>().Value.Text);
         }
 
-        // A further mutation is equally invisible. Conversion of an unconvertible value is covered by
-        // InvalidValueSetAfterRegistration_DoesNotBreakOptionsCreation, which needs a non-string property.
+        // Later mutations stay invisible.
         Environment.SetEnvironmentVariable("H03_TEXT", "also-ignored");
 
         using (var scope = provider.CreateScope())
@@ -435,9 +425,7 @@ public class OptionsLifecycleTests : EnvarTestsBase
     [Fact]
     public void EmptyVariable_IsCapturedAndPassedToTheBinder()
     {
-        // Constructed through the reader seam rather than the process environment: on net8.0
-        // Environment.SetEnvironmentVariable(name, "") deletes the variable instead of emptying it, so the
-        // scenario is not reachable in-process on every supported target framework.
+        // The reader seam preserves empty strings consistently across target frameworks.
         var reader = new RecordingReader(new Dictionary<string, string?> { ["H03_TEXT"] = string.Empty });
 
         var services = new ServiceCollection();

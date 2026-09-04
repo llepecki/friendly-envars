@@ -1,13 +1,5 @@
 #!/usr/bin/env bash
-#
-# Verifies that the options-blocking API removed in 2.0 has left no trace.
-#
-# The search is scoped exactly as the remediation specification requires: src/, tests/, sample/,
-# benchmarks/, README.md and the package release notes. API-compatibility suppressions and the review
-# artifact itself are excluded, because both legitimately name the removed members. The compiled public
-# surface is inspected as well, so a member cannot survive under a different spelling in source.
-#
-# Usage: eng/verify-api-removals.sh
+# Verify that the options-blocking API removed in 2.0 is absent from source and binaries.
 
 set -euo pipefail
 
@@ -16,10 +8,7 @@ VERIFIER_PROJECT="$REPO_ROOT/eng/FriendlyEnvars.RepositoryVerifier/FriendlyEnvar
 VERIFIER_DLL="$REPO_ROOT/eng/FriendlyEnvars.RepositoryVerifier/bin/Release/net10.0/FriendlyEnvars.RepositoryVerifier.dll"
 LIBRARY_ASSEMBLY="src/FriendlyEnvars/bin/Release/net8.0/FriendlyEnvars.dll"
 
-# Launches the verifier assembly directly through the muxer. `dotnet run` is deliberately avoided: it
-# re-evaluates the project, and when the wrapper's resolved repository path differs from the one the
-# solution build used (for example /private/var vs /var on macOS) MSBuild's incremental clean deletes
-# the runtime configuration out from under the run.
+# Avoid `dotnet run`; path aliases can trigger an incremental clean before execution.
 run_verifier() {
     if [[ ! -f "$VERIFIER_DLL" ]]; then
         dotnet build "$VERIFIER_PROJECT" --configuration Release --verbosity quiet --nologo >&2

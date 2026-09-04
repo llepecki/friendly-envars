@@ -8,17 +8,6 @@ using Xunit;
 
 namespace FriendlyEnvars.Tests;
 
-/// <summary>
-/// The subset of behaviour that depends on the host operating system or target framework rather than on
-/// the library alone: how environment-variable names and values survive a round trip through the real
-/// process environment, which property shapes are accepted, and when values are captured.
-/// </summary>
-/// <remarks>
-/// CI runs this class on Ubuntu, Windows and macOS under both target frameworks via
-/// <c>--filter 'Category=Portability'</c>. Everything here therefore goes through the real environment
-/// wherever the contract is about the environment, and only uses the internal reader seam where a
-/// scenario is not expressible in-process on every framework.
-/// </remarks>
 [Trait("Category", "Portability")]
 public class PortabilityContractTests : EnvarTestsBase
 {

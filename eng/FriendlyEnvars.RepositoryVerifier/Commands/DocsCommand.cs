@@ -10,16 +10,6 @@ using System.Xml.Linq;
 
 namespace FriendlyEnvars.RepositoryVerifier.Commands;
 
-/// <summary>
-/// Checks that the packaged XML documentation actually documents the packaged assembly.
-/// </summary>
-/// <remarks>
-/// Both sides come out of the .nupkg rather than out of the build tree, so this cannot pass on a stale
-/// or mismatched pair. Every externally visible member is enumerated from the assembly's metadata, its
-/// documentation ID is derived the way the compiler would write it, and an exact
-/// <c>&lt;member name="..."&gt;</c> entry is required for each. Entries whose summary is missing, empty
-/// or still an unresolved <c>&lt;inheritdoc/&gt;</c> are failures too, because they document nothing.
-/// </remarks>
 internal static class DocsCommand
 {
     public static void Run(CommandLine commandLine)
@@ -108,8 +98,7 @@ internal static class DocsCommand
 
             var summary = member.Element("summary");
 
-            // An <inheritdoc/> that survives into the packaged file was never resolved, so the member
-            // ships with nothing a reader can see.
+            // An unresolved <inheritdoc/> provides no packaged text.
             bool hasUsableSummary = summary is not null && !string.IsNullOrWhiteSpace(summary.Value);
 
             if (!hasUsableSummary && member.Element("inheritdoc") is null)
@@ -166,7 +155,6 @@ internal static class DocsCommand
 
                 string name = reader.GetString(method.Name);
 
-                // Property and event accessors are documented through the property or event itself.
                 if (IsAccessor(reader, type, methodHandle))
                 {
                     continue;
@@ -218,7 +206,6 @@ internal static class DocsCommand
 
                 string name = reader.GetString(field.Name);
 
-                // An enum's backing storage is not a documentable member.
                 if (name == "value__")
                 {
                     continue;

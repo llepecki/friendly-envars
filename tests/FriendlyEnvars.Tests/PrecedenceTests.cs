@@ -5,16 +5,6 @@ using Xunit;
 
 namespace FriendlyEnvars.Tests;
 
-/// <summary>
-/// FriendlyEnvars does not invent a precedence rule. Its configurator is an ordinary
-/// <see cref="IConfigureOptions{TOptions}"/>, so whichever registration runs last wins, exactly as it
-/// would between two <c>services.Configure</c> calls.
-/// </summary>
-/// <remarks>
-/// This matters because the alternative - forcing environment values to win by registering through
-/// <c>PostConfigure</c> - would silently defeat a deliberate override written after <c>BindEnvars</c>,
-/// and would differ from what every other options source does.
-/// </remarks>
 public class PrecedenceTests : EnvarTestsBase
 {
     public class Options

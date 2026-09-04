@@ -8,21 +8,14 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 
-// FriendlyEnvars sample. Run it with no arguments for the success path, or with --invalid-validation to
-// see data-annotation validation reject bad configuration during host startup.
-//
-// Two exit codes are contractual and are asserted by eng/run-sample.sh:
-//   0 - default mode, after printing SampleOutput.Success
-//   2 - --invalid-validation mode, after printing SampleOutput.ValidationFailed
-//
-// Nothing derived from a secret is ever written to stdout or stderr.
+// Exit 0 demonstrates valid binding. --invalid-validation exits 2 after startup validation fails.
+// eng/run-sample.sh checks both paths and verifies that no secret reaches the output.
 
 bool invalidValidation = args.Contains("--invalid-validation", StringComparer.Ordinal);
 
 SampleEnvironment.Apply(invalidValidation);
 
-// Defaults are disabled so the sample's output is exactly what it prints: no logging providers and no
-// configuration providers competing with FriendlyEnvars.
+// Disable host defaults to keep output and configuration sources deterministic.
 var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 {
     Args = args,
@@ -45,9 +38,7 @@ builder.Services
     .AddOptions<FeatureFlags>()
     .BindEnvars();
 
-// Two named registrations of one options type. Each BindEnvars call takes its own snapshot, so the two
-// names hold whatever the environment said at the moment each was registered - changing the variable
-// between the calls gives them different values, and nothing changes either of them afterwards.
+// Each named registration captures the current value.
 Environment.SetEnvironmentVariable("SAMPLE_REGION_ENDPOINT", "https://eu.example.com");
 
 builder.Services
@@ -72,14 +63,10 @@ if (invalidValidation)
     }
     catch (OptionsValidationException)
     {
-        // Only this exception is expected here. Its message is not printed: it is not needed, and not
-        // printing it keeps the output free of anything value-derived.
         Console.WriteLine(SampleOutput.ValidationFailed);
         return 2;
     }
 
-    // Reaching this point means invalid configuration was accepted, which is a failure of the sample's
-    // contract. The service is deliberately not resolved.
     Console.Error.WriteLine("Expected OptionsValidationException during StartAsync, but startup succeeded.");
     return 1;
 }
@@ -93,23 +80,15 @@ await host.StopAsync();
 Console.WriteLine(SampleOutput.Success);
 return 0;
 
-/// <summary>The exact lines eng/run-sample.sh asserts on.</summary>
 internal static class SampleOutput
 {
     public const string Success = "Sample completed successfully!";
     public const string ValidationFailed = "Validation failed during StartAsync as expected.";
 }
 
-/// <summary>
-/// Populates the environment the sample binds from, without overwriting anything the caller already set.
-/// </summary>
 internal static class SampleEnvironment
 {
-    /// <summary>
-    /// Stand-in credentials. They are not real, and nothing derived from them is ever printed - that is
-    /// asserted by eng/run-sample.sh, which checks the captured output for every 6-character window of
-    /// these literals.
-    /// </summary>
+    // The output gate checks that no six-character fragment of these fixtures is printed.
     private const string FakePassword = "QZXJKVWYPLMB0000";
 
     private const string FakeApiKey = "MBLPYWVKJXZQ1111";
@@ -122,7 +101,6 @@ internal static class SampleEnvironment
         SetIfAbsent("SAMPLE_DB_PASSWORD", FakePassword);
         SetIfAbsent("SAMPLE_DB_SSL_ENABLED", "true");
 
-        // Bound through SecondsAwareBinder, which accepts a plain number of seconds.
         SetIfAbsent("SAMPLE_DB_CONNECTION_TIMEOUT", "45");
 
         SetIfAbsent("SAMPLE_API_BASE_URL", "https://api.example.com");
@@ -134,8 +112,7 @@ internal static class SampleEnvironment
         SetIfAbsent("SAMPLE_FEATURE_CACHING", "true");
         SetIfAbsent("SAMPLE_FEATURE_METRICS", "false");
 
-        // 70000 is outside [Range(1, 65535)]. It converts to int perfectly well, so binding succeeds and
-        // the failure surfaces where it should: data-annotation validation during StartAsync.
+        // The invalid value converts to int, then fails data-annotation validation.
         Environment.SetEnvironmentVariable("SAMPLE_DB_PORT", invalidValidation ? "70000" : "5432");
     }
 
@@ -149,8 +126,7 @@ internal static class SampleEnvironment
 }
 
 /// <summary>
-/// Database configuration. Declared as a class rather than a record on purpose: a record's generated
-/// <see cref="object.ToString"/> would print every property, including the password.
+/// Database options. A class avoids a record-generated <see cref="object.ToString"/> that could expose secrets.
 /// </summary>
 public class DatabaseSettings
 {
@@ -180,7 +156,7 @@ public class DatabaseSettings
     public TimeSpan ConnectionTimeout { get; init; } = TimeSpan.FromSeconds(30);
 }
 
-/// <summary>API configuration. A class for the same reason as <see cref="DatabaseSettings"/>.</summary>
+/// <summary>API options that avoid record-generated secret output.</summary>
 public class ApiSettings
 {
     [Required]
@@ -202,7 +178,7 @@ public class ApiSettings
     public string? SupportEmail { get; init; }
 }
 
-/// <summary>Bound twice under two names, to show that each registration keeps its own snapshot.</summary>
+/// <summary>Options used to demonstrate named registrations.</summary>
 public class RegionSettings
 {
     [Envar("SAMPLE_REGION_ENDPOINT")]
@@ -222,13 +198,10 @@ public class FeatureFlags
 }
 
 /// <summary>
-/// Accepts a bare number of seconds for <see cref="TimeSpan"/> properties, and defers everything else to
-/// the built-in binder.
+/// Parses a <see cref="TimeSpan"/> from seconds and delegates other types.
 /// </summary>
 /// <remarks>
-/// A custom binder receives complete environment values, including secrets, and may be invoked
-/// concurrently. It must be deterministic and thread-safe, and must never log or retain what it is given.
-/// This one is stateless and writes nothing.
+/// This stateless binder is safe for concurrent calls and does not retain or print values.
 /// </remarks>
 public sealed class SecondsAwareBinder : IEnvarPropertyBinder
 {
@@ -246,8 +219,7 @@ public sealed class SecondsAwareBinder : IEnvarPropertyBinder
 }
 
 /// <summary>
-/// Consumes the bound options the way an application service would. It prints only non-secret fields;
-/// the password and the API key are used but never rendered.
+/// Reads the options and prints only non-secret values.
 /// </summary>
 public sealed class ConfigurationReporter
 {
@@ -290,8 +262,6 @@ public sealed class ConfigurationReporter
         Console.WriteLine($"Caching enabled   : {_features.CachingEnabled}");
         Console.WriteLine($"Metrics enabled   : {_features.MetricsEnabled}");
 
-        // Named options are reached the ordinary way: Create on the factory, Get on the monitor, and
-        // Get on a scoped snapshot. Nothing about FriendlyEnvars changes how any of them behave.
         using var scope = _scopeFactory.CreateScope();
         var snapshot = scope.ServiceProvider.GetRequiredService<IOptionsSnapshot<RegionSettings>>();
 
@@ -303,10 +273,6 @@ public sealed class ConfigurationReporter
         }
     }
 
-    /// <summary>
-    /// Reports whether a secret was supplied without disclosing any part of it. Deliberately does not
-    /// print a prefix, a suffix or the length, because each of those narrows a search.
-    /// </summary>
     private static string DescribeSecret(string? secret)
     {
         return string.IsNullOrEmpty(secret) ? "<not set>" : "<set, redacted>";

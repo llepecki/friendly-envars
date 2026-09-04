@@ -5,17 +5,6 @@ using System.Security.Cryptography;
 
 namespace FriendlyEnvars.RepositoryVerifier.Commands;
 
-/// <summary>
-/// Compares two NuGet packages by their complete extracted payload: the sorted relative-path list and
-/// a SHA-256 of every entry's bytes. ZIP container data (entry timestamps, ordering, compression) is
-/// the only thing not compared, because extraction discards it.
-/// </summary>
-/// <remarks>
-/// Backs two gates. <c>reproducible-package</c> compares two builds of the same commit and exempts
-/// nothing. <c>published-package</c> compares a workflow artifact against the copy nuget.org serves
-/// and exempts exactly <c>.signature.p7s</c>, because repository signing adds that entry and changes
-/// nothing else it is allowed to change.
-/// </remarks>
 internal static class PackageCompareCommand
 {
     public static void Run(CommandLine commandLine, bool exemptRepositorySignature)

@@ -7,16 +7,7 @@ using System.Text;
 
 namespace FriendlyEnvars.RepositoryVerifier;
 
-/// <summary>
-/// Renders metadata signatures in the form the C# compiler uses for XML documentation IDs, so a
-/// member found in the compiled assembly can be matched against a <c>&lt;member name="..."&gt;</c>
-/// entry exactly rather than approximately.
-/// </summary>
-/// <remarks>
-/// The rules implemented here are the ones ECMA-334 Annex E specifies: a nested type is separated by
-/// '.', a constructed generic wraps its arguments in braces, a type parameter is `N and a method type
-/// parameter is ``N, by-reference is suffixed '@', pointer '*', and an array of rank one '[]'.
-/// </remarks>
+// Formats metadata signatures as C# XML documentation IDs.
 internal sealed class DocumentationIdProvider : ISignatureTypeProvider<string, object?>
 {
     private readonly MetadataReader _reader;
@@ -129,7 +120,6 @@ internal sealed class DocumentationIdProvider : ISignatureTypeProvider<string, o
             _ => throw new VerificationException($"Unsupported type handle kind '{handle.Kind}'.")
         };
 
-    /// <summary>Removes the `N arity suffix the CLR appends to a generic type's metadata name.</summary>
     private static string StripArity(string name)
     {
         int tick = name.LastIndexOf('`');
@@ -144,10 +134,6 @@ internal sealed class DocumentationIdProvider : ISignatureTypeProvider<string, o
         }
     }
 
-    /// <summary>
-    /// Builds the parenthesised parameter list of a method documentation ID, or an empty string when the
-    /// method takes none.
-    /// </summary>
     public static string FormatParameters(IReadOnlyList<string> parameterTypes)
     {
         if (parameterTypes.Count == 0)

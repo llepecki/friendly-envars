@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
-#
-# Proves the release package is a function of the committed tree and nothing else: two clean copies of
-# the same commit, built and packed independently in different directories, must produce packages whose
-# complete extracted payloads are identical, file for file and byte for byte. ZIP container timestamps
-# are the only data not compared, because the comparison happens on extracted content.
-#
-# Usage: eng/verify-reproducible-package.sh
+# Compare packages built from two clean copies of the same commit.
 
 set -euo pipefail
 
@@ -13,10 +7,7 @@ REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 VERIFIER_PROJECT="$REPO_ROOT/eng/FriendlyEnvars.RepositoryVerifier/FriendlyEnvars.RepositoryVerifier.csproj"
 VERIFIER_DLL="$REPO_ROOT/eng/FriendlyEnvars.RepositoryVerifier/bin/Release/net10.0/FriendlyEnvars.RepositoryVerifier.dll"
 
-# Launches the verifier assembly directly through the muxer. `dotnet run` is deliberately avoided: it
-# re-evaluates the project, and when the wrapper's resolved repository path differs from the one the
-# solution build used (for example /private/var vs /var on macOS) MSBuild's incremental clean deletes
-# the runtime configuration out from under the run.
+# Avoid `dotnet run`; path aliases can trigger an incremental clean before execution.
 run_verifier() {
     if [[ ! -f "$VERIFIER_DLL" ]]; then
         dotnet build "$VERIFIER_PROJECT" --configuration Release --verbosity quiet --nologo >&2

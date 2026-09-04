@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 #
-# Full-history secret scan with a pinned, checksum-verified Gitleaks binary.
-#
-# The binary is downloaded fresh into a temporary directory on every run and never installed. Every
-# part of the supply chain is pinned and fails closed: the version, the initial URL, the one permitted
-# redirect target, and a SHA-256 per platform, verified before anything is extracted or executed.
+# Runs a full-history scan with a temporary, checksum-verified Gitleaks binary.
 #
 # Usage: eng/secret-scan.sh
 
@@ -19,12 +15,10 @@ fi
 
 readonly GITLEAKS_VERSION="8.30.1"
 
-# GitHub release downloads answer with one redirect to the release-assets host. Both hops are pinned:
-# the initial URL exactly, and the effective host exactly. A direct response, a second redirect, any
-# other host, or any non-HTTPS hop is rejected.
+# Allow one HTTPS redirect from GitHub to its release-assets host.
 readonly EXPECTED_REDIRECT_HOST="release-assets.githubusercontent.com"
 
-# Per-platform archive checksums for v8.30.1. Any platform not listed here fails closed.
+# Unlisted platforms fail closed.
 case "$(uname -s)/$(uname -m)" in
     Linux/x86_64)
         PLATFORM="linux_x64"
@@ -52,10 +46,7 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 
 ARCHIVE="$WORK_DIR/$ARCHIVE_NAME"
 
-# --proto '=https' pins the first hop to HTTPS and --proto-redir '=https' pins every redirect hop, so
-# no downgrade is possible. --max-redirs 1 makes curl itself fail on a second redirect. The write-out
-# reports how many redirects were actually taken and where the download really came from, which is
-# asserted below rather than assumed.
+# Capture the redirect count and effective URL for validation.
 CURL_METADATA="$(curl --silent --show-error --fail \
     --location --max-redirs 1 \
     --proto '=https' --proto-redir '=https' \
@@ -87,7 +78,7 @@ if [[ "$EFFECTIVE_HOST" != "$EXPECTED_REDIRECT_HOST" ]]; then
     exit 1
 fi
 
-# The checksum is verified before anything is extracted or executed.
+# Verify before extraction.
 if command -v sha256sum >/dev/null 2>&1; then
     ACTUAL_SHA256="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
 else
@@ -101,7 +92,7 @@ if [[ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]]; then
     exit 1
 fi
 
-# Only the binary is extracted; the archive's other members are never written to disk.
+# Extract only the binary.
 tar -xzf "$ARCHIVE" -C "$WORK_DIR" gitleaks
 GITLEAKS="$WORK_DIR/gitleaks"
 
@@ -110,7 +101,6 @@ if [[ ! -x "$GITLEAKS" ]]; then
     exit 1
 fi
 
-# The binary must be the pinned version, not merely a correctly-hashed archive of something else.
 REPORTED_VERSION="$("$GITLEAKS" version)"
 
 if [[ "$REPORTED_VERSION" != "$GITLEAKS_VERSION" ]]; then
@@ -118,10 +108,7 @@ if [[ "$REPORTED_VERSION" != "$GITLEAKS_VERSION" ]]; then
     exit 1
 fi
 
-# Full-history scan across all refs, redacted so a finding's own output cannot leak the secret it
-# found. Gitleaks discovers the repository's .gitleaks.toml itself, which extends the default ruleset
-# with the reviewed fixture allowlist. A dirty tree is not a prerequisite failure: the scan covers
-# commits, and the CI checkout is always clean.
+# Scan every ref and redact findings.
 cd "$REPO_ROOT"
 
 "$GITLEAKS" git --redact --no-banner --exit-code 1 --log-opts="--all" .

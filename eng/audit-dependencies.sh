@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 #
-# Audits every checked-in project for vulnerable packages, direct and transitive, across all of its
-# target frameworks, and verifies that dependency restore is constrained the way REV-M05 requires.
-#
-# Fails on NU1902/NU1903/NU1904 and on any reported Moderate, High or Critical advisory. Low advisories
-# are reported but do not fail, matching the configured audit level.
+# Checks locked sources and scans every project for moderate-or-higher vulnerabilities.
 #
 # Usage: eng/audit-dependencies.sh
 
@@ -20,8 +16,7 @@ fi
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
-# Only checked-in projects. Transient consumer projects created under the OS temporary directory by
-# eng/smoke-consumer.sh are deliberately out of scope.
+# Transient smoke-test projects are outside the repository and out of scope.
 PROJECTS=()
 
 while IFS= read -r project; do
@@ -35,10 +30,7 @@ fi
 
 FAILED=0
 
-# nuget.org is the only source any checked-in project may restore from. The source list is read back
-# from NuGet itself rather than from the committed NuGet.config, because that is what makes <clear />
-# observable: a source inherited from a user- or machine-level configuration appears here even though it
-# appears nowhere in this repository.
+# Ask NuGet for the effective sources so inherited configuration cannot stay hidden.
 EXPECTED_SOURCE="https://api.nuget.org/v3/index.json"
 SOURCES_FILE="$WORK_DIR/sources.txt"
 
@@ -49,11 +41,7 @@ if ! (cd "$REPO_ROOT" && dotnet nuget list source --format Short) > "$SOURCES_FI
 else
     ENABLED=()
 
-    # Short format is one source per line: a legend field then the URL. The legend is "E" (enabled) or
-    # "D" (disabled), optionally followed by "M" for a machine-wide source and "O" for an official one,
-    # concatenated with no separator - so an enabled machine-wide source prints "EM <url>". Matching
-    # only a bare "E" would make exactly the machine-wide sources this check exists to catch invisible.
-    # An unrecognised legend or an unparseable line fails rather than being skipped.
+    # Legends combine enabled/disabled with optional machine-wide and official flags.
     while IFS= read -r line; do
         if [[ -z "${line//[[:space:]]/}" ]]; then
             continue
@@ -88,9 +76,7 @@ else
     fi
 fi
 
-# Every checked-in project must carry a tracked lock file. An untracked one would let a locked restore
-# pass locally and resolve something different in CI. This tests the index rather than HEAD, which is
-# what allows the check to run on a staged tree before the commit exists.
+# Check the index so staged lock files count and untracked ones do not.
 for project in "${PROJECTS[@]}"; do
     lock="$(dirname "$project")/packages.lock.json"
 
@@ -100,9 +86,7 @@ for project in "${PROJECTS[@]}"; do
     fi
 done
 
-# The locked restore is the mechanism the lock files exist for, so the gate exercises it rather than
-# assuming it. It must also leave the lock files untouched; a restore that rewrites one is a restore
-# that resolved something the committed graph does not describe.
+# A locked restore must succeed without rewriting the graph.
 if ! (cd "$REPO_ROOT" && dotnet restore FriendlyEnvars.slnx --locked-mode) > "$WORK_DIR/locked-restore.txt" 2>&1; then
     echo "audit-dependencies: locked restore failed" >&2
     cat "$WORK_DIR/locked-restore.txt" >&2
@@ -128,10 +112,7 @@ for project in "${PROJECTS[@]}"; do
         continue
     fi
 
-    # NU1900 means the vulnerability data could not be retrieved. It is fatal here because the listing
-    # below reports nothing when the data is missing, which is indistinguishable from a clean result;
-    # without this check an offline or source-blocked run would certify the repository as audited when
-    # nothing was audited.
+    # NU1900 means no vulnerability data was available.
     if grep -qE 'NU1900' "$output"; then
         echo "audit-dependencies: '$project' could not obtain vulnerability data, so nothing was audited:" >&2
         grep -E 'NU1900' "$output" | sort -u >&2
@@ -139,8 +120,7 @@ for project in "${PROJECTS[@]}"; do
         continue
     fi
 
-    # The restore itself reports advisories as NU1902/NU1903/NU1904 when auditing is enabled.
-    # NU1901 is excluded: it is the low-severity advisory, which is reported without failing.
+    # NU1902-NU1904 are moderate through critical; NU1901 is informational here.
     if grep -qE 'NU190[234]' "$output"; then
         echo "audit-dependencies: '$project' reported a NuGet audit diagnostic:" >&2
         grep -E 'NU190[234]' "$output" | sort -u >&2
@@ -148,8 +128,7 @@ for project in "${PROJECTS[@]}"; do
         continue
     fi
 
-    # dotnet list exits 0 even when it reports advisories, so inspecting its output is load-bearing
-    # rather than belt-and-braces. It prints one row per vulnerable package with severity in a column.
+    # `dotnet list` exits 0 when it finds advisories, so inspect its output.
     if grep -qiE '[[:space:]](Moderate|High|Critical)[[:space:]]' "$output"; then
         echo "audit-dependencies: '$project' has Moderate-or-higher advisories:" >&2
         grep -iE '[[:space:]](Moderate|High|Critical)[[:space:]]' "$output" >&2

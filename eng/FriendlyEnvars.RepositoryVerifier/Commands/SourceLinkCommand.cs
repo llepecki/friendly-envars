@@ -9,17 +9,7 @@ using System.Text.Json;
 
 namespace FriendlyEnvars.RepositoryVerifier.Commands;
 
-/// <summary>
-/// Verifies the Source Link contract of a symbol package by reading the portable PDB itself: every
-/// compiled document must map through the embedded Source Link JSON to a URL that pins the exact
-/// release commit, and the mapped content must hash to what the compiler recorded.
-/// </summary>
-/// <remarks>
-/// This is a structured reimplementation of what `dotnet sourcelink test` checks. The specified
-/// Source Link CLI does not exist at the pinned version on nuget.org, the only package source this
-/// repository permits, so the verification is done here with in-box metadata APIs instead of an
-/// unavailable tool. The deviation is deliberate and recorded in the finding's handoff.
-/// </remarks>
+// Uses in-box metadata APIs because the pinned Source Link CLI is unavailable on nuget.org.
 internal static class SourceLinkCommand
 {
     private static readonly Guid SourceLinkKind = new("CC110556-A091-4D38-9FEC-25AB9A351A6A");
@@ -128,7 +118,7 @@ internal static class SourceLinkCommand
             return;
         }
 
-        // The release contract: content is addressed by the immutable commit, never by a ref.
+        // Release sources must use an immutable commit, not a branch or tag.
         string requiredPrefix = $"https://raw.githubusercontent.com{new Uri(expectedRepositoryUrl).AbsolutePath}/{expectedCommit}/";
 
         foreach (var (pattern, url) in mappings)
@@ -159,8 +149,7 @@ internal static class SourceLinkCommand
 
             if (embeddedDocuments.Contains(documentHandle))
             {
-                // Untracked (generated) sources are embedded in the PDB itself; there is nothing
-                // remote or in the worktree to compare them against.
+                // Generated sources are embedded, so no external copy exists to compare.
                 embeddedCount++;
                 continue;
             }

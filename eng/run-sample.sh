@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
 #
-# Executes the sample as a contract rather than as documentation.
-#
-# For each target framework it asserts:
-#   * default mode exits 0 and prints the exact success line
-#   * --invalid-validation exits 2 and prints the exact fixed validation line
-#   * neither stream discloses the sample's stand-in credentials, checked down to every
-#     6-character window of them
+# Runs both sample modes on each target and checks output for secret fragments.
 #
 # Usage: eng/run-sample.sh
 
@@ -35,14 +29,12 @@ for required in "$SAMPLE_PROJECT" "$SAMPLE_PROGRAM"; do
     fi
 done
 
-# The sample only fills in variables that are unset. Clearing them first guarantees it uses its own
-# stand-in credentials, so the secrecy assertion below cannot be made vacuous by an inherited value.
+# Clear inherited values so the sample uses its checked fixtures.
 while IFS= read -r inherited_name; do
     unset "$inherited_name"
 done < <(env | sed -n 's/^\(SAMPLE_[A-Za-z0-9_]*\)=.*/\1/p')
 
-# The credentials are read out of the sample's own source rather than duplicated here, so the secrecy
-# assertion can never quietly go stale by drifting away from what the sample actually uses.
+# Read fixtures from their source of truth.
 read_constant() {
     sed -n "s/.*private const string $1 = \"\\([^\"]*\\)\";.*/\\1/p" "$SAMPLE_PROGRAM" | head -1
 }
@@ -55,8 +47,7 @@ if [[ ${#FAKE_PASSWORD} -lt 6 || ${#FAKE_API_KEY} -lt 6 ]]; then
     exit 1
 fi
 
-# Every 6-character window of each credential. A longer disclosure necessarily contains one of these, so
-# matching on 6-character windows also catches any longer fragment.
+# Any longer disclosure contains one of these six-character windows.
 WINDOWS_FILE="$WORK_DIR/windows.txt"
 : > "$WINDOWS_FILE"
 
@@ -99,9 +90,7 @@ assert_no_secret_disclosure() {
     fi
 }
 
-# Built unconditionally. The presence of a bin/Release directory says nothing about whether its contents
-# were produced from the current source, and every run below uses --no-build, so skipping this would let
-# the gate certify stale - or uncompilable - sample code. Incremental MSBuild makes the repeat cheap.
+# Build first because the runs use --no-build.
 dotnet build "$SAMPLE_PROJECT" --configuration Release --verbosity quiet --nologo >&2
 
 for framework in $FRAMEWORKS; do
@@ -141,12 +130,7 @@ for framework in $FRAMEWORKS; do
         exit 1
     fi
 
-    # Reaching service resolution in this mode would mean invalid configuration was accepted. Requiring
-    # the validation line to be the only output catches any resolution that SUCCEEDED, because the
-    # reporter prints one line per bound setting. A resolution that itself throws
-    # OptionsValidationException produces no output and is not externally distinguishable from the
-    # compliant path; the source-level guarantee is that the reporter is only resolved after StartAsync
-    # has returned, which happens solely on the default path.
+    # Invalid mode must stop before the reporter prints anything.
     if grep -qFx -- "$SUCCESS_LINE" "$invalid_output"; then
         echo "run-sample: --invalid-validation on $framework reached the success path" >&2
         exit 1

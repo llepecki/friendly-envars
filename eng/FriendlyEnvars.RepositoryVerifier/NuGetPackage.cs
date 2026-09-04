@@ -7,10 +7,6 @@ using System.Xml.Linq;
 
 namespace FriendlyEnvars.RepositoryVerifier;
 
-/// <summary>
-/// Structured reader for a NuGet package. Entries and metadata are read through the ZIP and XML object
-/// models rather than by matching text, so a gate can never pass on a coincidental substring.
-/// </summary>
 internal sealed class NuGetPackage : IDisposable
 {
     private readonly ZipArchive _archive;
@@ -25,7 +21,6 @@ internal sealed class NuGetPackage : IDisposable
 
     public string Path { get; }
 
-    /// <summary>All archive entry names, in archive order, normalised to forward slashes.</summary>
     public IReadOnlyList<string> Entries { get; }
 
     public XDocument Nuspec { get; }
@@ -78,15 +73,10 @@ internal sealed class NuGetPackage : IDisposable
         }
     }
 
-    /// <summary>The nuspec's &lt;metadata&gt; element, which every well-formed package declares.</summary>
     public XElement Metadata =>
         Nuspec.Root?.Elements().FirstOrDefault(static e => e.Name.LocalName == "metadata")
         ?? throw new VerificationException($"Package '{Path}' has a .nuspec with no <metadata> element.");
 
-    /// <summary>
-    /// Reads a single &lt;metadata&gt; child by local name, ignoring the nuspec schema namespace, which
-    /// varies by SDK version.
-    /// </summary>
     public string? GetMetadata(string localName)
     {
         var matches = Metadata.Elements().Where(e => e.Name.LocalName == localName).ToArray();
@@ -104,7 +94,6 @@ internal sealed class NuGetPackage : IDisposable
         return matches[0].Value;
     }
 
-    /// <summary>Reads one entry's bytes, failing if it is absent or duplicated.</summary>
     public byte[] ReadEntry(string packagePath)
     {
         string normalised = NormalisePackagePath(packagePath);
@@ -129,10 +118,6 @@ internal sealed class NuGetPackage : IDisposable
         return Entries.Count(entry => string.Equals(entry, normalised, StringComparison.Ordinal));
     }
 
-    /// <summary>
-    /// Accepts the leading-slash form used by the specification (<c>/lib/net8.0/FriendlyEnvars.dll</c>)
-    /// as well as the archive's own relative form.
-    /// </summary>
     public static string NormalisePackagePath(string packagePath)
     {
         return packagePath.Replace('\\', '/').TrimStart('/');

@@ -6,19 +6,10 @@ using Xunit;
 
 namespace FriendlyEnvars.Tests;
 
-/// <summary>
-/// The environment-variable name policy, asserted through both routes that read a name: constructing
-/// <see cref="EnvarAttribute"/> directly, and binding, which decodes the name out of metadata without
-/// constructing the attribute at all.
-/// </summary>
-/// <remarks>
-/// Marked as a portability contract because what a name may contain is exactly where operating systems
-/// disagree. CI runs this class on Ubuntu, Windows and macOS under both target frameworks.
-/// </remarks>
 [Trait("Category", "Portability")]
 public class EnvironmentNameTests : EnvarTestsBase
 {
-    // ----- Rejected names, as metadata that binding must decode and reject -----
+    // Rejected metadata names.
 
     public class NullName
     {
@@ -92,7 +83,7 @@ public class EnvironmentNameTests : EnvarTestsBase
         public string? Value { get; set; }
     }
 
-    // ----- Accepted names -----
+    // Accepted names.
 
     public class SingleLetterName
     {
@@ -118,7 +109,6 @@ public class EnvironmentNameTests : EnvarTestsBase
         public string? Value { get; set; }
     }
 
-    /// <summary>The exact rejected corpus. Null is passed through a nullable parameter.</summary>
     public static TheoryData<string?> RejectedNames() =>
     [
         null, "", " ", "   ", "\t", "\n", "\t\n", "A\0B", "A\nB", "A\tB", "A=B", "="
@@ -147,8 +137,7 @@ public class EnvironmentNameTests : EnvarTestsBase
     [Fact]
     public void DirectConstruction_AcceptsAFourKibibyteName()
     {
-        // Long names are a metadata and attribute-construction concern only: operating systems impose
-        // different limits on the environment block, so this name is never written to the environment.
+        // OS limits differ, so this long name is never written to the environment.
         string name = new('A', 4096);
 
         var attribute = new EnvarAttribute(name);
@@ -156,8 +145,7 @@ public class EnvironmentNameTests : EnvarTestsBase
         Assert.Equal(name, attribute.Name);
         Assert.Equal(4096, attribute.Name.Length);
 
-        // Binding decodes names from metadata and validates them with this same predicate, so accepting
-        // the name here means the metadata route accepts it too.
+        // Attribute construction and metadata binding use the same validation rule.
         Assert.True(EnvarAttribute.IsValidName(name));
     }
 
@@ -236,8 +224,7 @@ public class EnvironmentNameTests : EnvarTestsBase
     private static void AssertBindsThroughTheRealEnvironment<T>(string name, Func<T, string?> read)
         where T : class, new()
     {
-        // Goes through the process environment rather than the reader seam: which names survive a round
-        // trip is exactly the part that differs between operating systems.
+        // A real environment round trip exposes OS-specific behavior.
         Environment.SetEnvironmentVariable(name, "round-tripped");
 
         try
@@ -271,7 +258,7 @@ public class EnvironmentNameTests : EnvarTestsBase
     public void Binding_AcceptsANonAsciiName() =>
         AssertBindsThroughTheRealEnvironment<UnicodeName>("Å_VAR", static options => options.Value);
 
-    // ----- The attribute is never constructed during binding -----
+    // Binding reads attribute metadata without constructing the attribute.
 
     public class ThrowingAttributeShapeOptions
     {
@@ -292,14 +279,13 @@ public class EnvironmentNameTests : EnvarTestsBase
 
         Assert.Equal("decoded", provider.GetRequiredService<IOptions<ThrowingAttributeShapeOptions>>().Value.Value);
 
-        // A type carrying a name the attribute constructor would reject still binds far enough to report
-        // a structured failure, which is only possible because the constructor is never invoked.
+        // Structured failure proves the attribute constructor was not invoked.
         var rejected = new ServiceCollection();
         Assert.Throws<EnvarsException>(
             () => BindCapturedEnvironment<EqualsInsideName>(rejected, new Dictionary<string, string?>()));
     }
 
-    // ----- Attribute inheritance must survive the switch to metadata decoding -----
+    // Metadata decoding must preserve attribute inheritance.
 
     public abstract class DecoratedBase
     {
@@ -312,7 +298,6 @@ public class EnvironmentNameTests : EnvarTestsBase
         public override string? Overridden { get; set; }
     }
 
-    /// <summary>A three-level chain with the attribute on the MIDDLE declaration.</summary>
     public abstract class ChainRoot
     {
         public virtual string? Chained { get; set; }
@@ -360,7 +345,6 @@ public class EnvironmentNameTests : EnvarTestsBase
         }
     }
 
-    /// <summary>Both an invalid name and an unsupported shape, to pin which is reported.</summary>
     public class InvalidNameAndShape
     {
         [Envar("A=B")]
@@ -370,8 +354,7 @@ public class EnvironmentNameTests : EnvarTestsBase
     [Fact]
     public void Binding_FindsAnAttributeDeclaredOnAnIntermediateOverride()
     {
-        // The base chain must be walked one level at a time. MethodInfo.GetBaseDefinition returns the
-        // ROOT declaration, so jumping straight there would skip ChainMiddle and silently stop binding.
+        // Walking straight to the root would skip the attributed middle declaration.
         var services = new ServiceCollection();
         BindCapturedEnvironment<ChainLeaf>(services, new Dictionary<string, string?>
         {
@@ -386,9 +369,7 @@ public class EnvironmentNameTests : EnvarTestsBase
     [Fact]
     public void Binding_RejectsAnOverriddenDecoratedIndexerWhoseBaseIsOverloaded()
     {
-        // Looking the base property up by name alone would raise AmbiguousMatchException here. Swallowing
-        // that would drop the indexer from discovery entirely instead of rejecting it as an unsupported
-        // bind target.
+        // Name-only lookup would make the indexer ambiguous and skip shape validation.
         var services = new ServiceCollection();
 
         var exception = Assert.Throws<EnvarsException>(
@@ -402,8 +383,7 @@ public class EnvironmentNameTests : EnvarTestsBase
     [Fact]
     public void Binding_ReportsTheInvalidNameBeforeTheUnsupportedShape()
     {
-        // The unsupported-shape failure carries a validated attribute name, so the name has to be checked
-        // first; otherwise that row would have to echo malformed metadata.
+        // Validate the name before reporting the unsupported shape.
         var services = new ServiceCollection();
 
         var exception = Assert.Throws<EnvarsException>(
@@ -419,8 +399,7 @@ public class EnvironmentNameTests : EnvarTestsBase
     [Fact]
     public void Binding_StillFindsAnAttributeOnAnOverriddenVirtualProperty()
     {
-        // GetCustomAttributesData does not walk the inheritance chain, so this would silently stop
-        // binding if the override were not followed explicitly.
+        // GetCustomAttributesData does not walk the inheritance chain.
         var services = new ServiceCollection();
         BindCapturedEnvironment<OverridingDerived>(services, new Dictionary<string, string?>
         {

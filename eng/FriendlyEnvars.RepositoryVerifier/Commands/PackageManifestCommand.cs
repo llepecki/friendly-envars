@@ -5,10 +5,6 @@ using System.Linq;
 
 namespace FriendlyEnvars.RepositoryVerifier.Commands;
 
-/// <summary>
-/// Asserts the exact file manifest of a NuGet package: every required package path is present exactly
-/// once, no forbidden path is present, and the archive contains no duplicate entry names.
-/// </summary>
 internal static class PackageManifestCommand
 {
     public static void Run(CommandLine commandLine)

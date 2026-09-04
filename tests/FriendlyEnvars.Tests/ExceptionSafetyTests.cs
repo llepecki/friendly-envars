@@ -8,24 +8,11 @@ using Xunit;
 
 namespace FriendlyEnvars.Tests;
 
-/// <summary>
-/// Proves that no part of an environment-variable value can reach an exception the library raises.
-/// </summary>
-/// <remarks>
-/// Every scenario binds a sentinel value that is deliberately hostile: it is token-shaped, spans multiple
-/// lines, carries an ANSI escape sequence, and is over 4 KiB long. A failure is then forced and the
-/// exception is checked for the whole sentinel and for every distinct 8-character window of it, across the
-/// message, the full <see cref="Exception.ToString"/> rendering, the inner exception and every structured
-/// property. Checking short windows catches partial disclosure, which a whole-string check would miss.
-/// </remarks>
+// Checks every eight-character sentinel window to catch partial value disclosure.
 public class ExceptionSafetyTests : EnvarTestsBase
 {
     private const int WindowLength = 8;
 
-    /// <summary>
-    /// The sentinel used as the environment-variable value. Built from a deliberately unusual alphabet so
-    /// that an accidental match against a type name, a file path or a stack frame is not credible.
-    /// </summary>
     private static readonly string Sentinel = BuildSentinel();
 
     private static readonly IReadOnlyCollection<string> SentinelWindows = BuildWindows(Sentinel);
@@ -40,8 +27,7 @@ public class ExceptionSafetyTests : EnvarTestsBase
         builder.Append("\u001b[31mANSI-ESCAPED-SEGMENT\u001b[0m");
         builder.Append("\r\n");
 
-        // Deterministic filler over an alphabet that does not occur in .NET type names or repository paths.
-        // A hand-rolled generator keeps the sentinel byte-identical on every runtime and platform.
+        // Deterministic filler avoids accidental matches and runtime differences.
         const string Alphabet = "QXZJKVW0123456789";
         uint state = 20260903;
 
@@ -66,10 +52,6 @@ public class ExceptionSafetyTests : EnvarTestsBase
         return windows;
     }
 
-    /// <summary>
-    /// Asserts that the exception is a sanitised, library-generated failure that discloses nothing about
-    /// the bound value.
-    /// </summary>
     private static void AssertNoValueDisclosure(EnvarsException exception)
     {
         // A library-generated failure never keeps the cause, because the cause's message quotes the value.
@@ -100,9 +82,6 @@ public class ExceptionSafetyTests : EnvarTestsBase
         }
     }
 
-    /// <summary>
-    /// Captures a failure raised while the options type is registered, before any service is resolved.
-    /// </summary>
     private static EnvarsException RegisterAndCaptureFailure<T>(string optionsName = "")
         where T : class, new()
     {
@@ -157,8 +136,7 @@ public class ExceptionSafetyTests : EnvarTestsBase
     {
         public object? Convert(string value, Type targetType, CultureInfo culture)
         {
-            // A custom binder raising the library's own exception type must be sanitised like any other:
-            // it would otherwise pass an unsanitised message straight through to the caller.
+            // Sanitize EnvarsException thrown by a custom binder too.
             throw new EnvarsException($"binder rejected the value: {value}");
         }
     }
@@ -239,7 +217,7 @@ public class ExceptionSafetyTests : EnvarTestsBase
         // The setter's exception arrives wrapped by reflection; the reported cause is the real one.
         Assert.Equal(typeof(InvalidOperationException).FullName, exception.CauseType);
 
-        // Assignment failures carry no culture or binder, which is what distinguishes them from conversion.
+        // Assignment failures have no conversion metadata.
         Assert.Null(exception.CultureName);
         Assert.Null(exception.BinderType);
 
@@ -254,8 +232,7 @@ public class ExceptionSafetyTests : EnvarTestsBase
     {
         SetEnvironmentVariable("H01_READONLY", Sentinel);
 
-        // An unsupported shape is rejected while the options type is registered, before the environment
-        // is read, so the failure never reaches options creation.
+        // Unsupported shapes fail during registration, before environment reads.
         var exception = RegisterAndCaptureFailure<ReadOnlyOptions>();
 
         AssertNoValueDisclosure(exception);

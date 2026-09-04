@@ -6,11 +6,6 @@ using Xunit;
 
 namespace FriendlyEnvars.Tests;
 
-/// <summary>
-/// Named options behave exactly as they do for any other options source, with one property that is
-/// specific to this library: each <c>BindEnvars</c> call captures the environment separately, so two
-/// names of the same type can hold different values and neither changes afterwards.
-/// </summary>
 public class NamedOptionsTests : EnvarTestsBase
 {
     private const string VariableName = "L05_ENDPOINT";
@@ -21,9 +16,6 @@ public class NamedOptionsTests : EnvarTestsBase
         public string Endpoint { get; set; } = "unset";
     }
 
-    /// <summary>
-    /// Registers two names of one type against two different captured values, mirroring the sample.
-    /// </summary>
     private static ServiceCollection RegisterTwoRegions()
     {
         var services = new ServiceCollection();

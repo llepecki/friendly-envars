@@ -6,10 +6,6 @@ using Xunit;
 
 namespace FriendlyEnvars.Tests;
 
-/// <summary>
-/// The configuration surface's null contracts, and the guarantee that nothing a caller does to the
-/// settings object or to the culture they supplied can change how values are parsed afterwards.
-/// </summary>
 public class EnvarSettingsTests : EnvarTestsBase
 {
     public class NumericOptions
@@ -18,7 +14,6 @@ public class EnvarSettingsTests : EnvarTestsBase
         public double Number { get; set; }
     }
 
-    /// <summary>A type with no decorated properties at all, so nothing is ever read.</summary>
     public class NoDecoratedProperties
     {
         public string Untouched { get; set; } = "untouched";

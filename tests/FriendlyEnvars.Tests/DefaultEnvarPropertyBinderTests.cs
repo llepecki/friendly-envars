@@ -495,15 +495,11 @@ public class DefaultEnvarPropertyBinderTests
         }
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // Enum text grammar. Exercised across every legal underlying type, for both flags and non-flags
-    // enums, including the case-collision rules.
-    // ---------------------------------------------------------------------------------------------
+    // Enum grammar across all underlying types, flags modes, and case collisions.
 
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
 
-    // Every flags fixture declares the same members, so one table of expectations covers all eight
-    // underlying types. The allowed mask is therefore 0b111.
+    // All flags fixtures use the same members and 0b111 allowed mask.
     [Flags] public enum FlagsByte : byte { None = 0, Read = 1, Write = 2, ReadWrite = 3, Execute = 4 }
     [Flags] public enum FlagsSByte : sbyte { None = 0, Read = 1, Write = 2, ReadWrite = 3, Execute = 4 }
     [Flags] public enum FlagsInt16 : short { None = 0, Read = 1, Write = 2, ReadWrite = 3, Execute = 4 }
@@ -522,13 +518,10 @@ public class DefaultEnvarPropertyBinderTests
     public enum PlainInt64 : long { Zero = 0, One = 1, Two = 2 }
     public enum PlainUInt64 : ulong { Zero = 0, One = 1, Two = 2 }
 
-    /// <summary>A signed flags enum declaring a negative member, as <c>All = -1</c> commonly is.</summary>
     [Flags] public enum FlagsWithNegative { None = 0, Read = 1, Write = 2, All = -1 }
 
-    /// <summary>A non-flags enum declaring a negative member.</summary>
     public enum PlainWithNegative { All = -1, Zero = 0, One = 1 }
 
-    /// <summary>Members differing only by case: two with different values, two with the same value.</summary>
     [Flags] public enum FlagsCollision { Read = 1, READ = 2, Same = 4, SAME = 4 }
 
     public enum PlainCollision { Read = 1, READ = 2, Same = 4, SAME = 4 }
@@ -545,7 +538,6 @@ public class DefaultEnvarPropertyBinderTests
         typeof(PlainInt32), typeof(PlainUInt32), typeof(PlainInt64), typeof(PlainUInt64)
     ];
 
-    /// <summary>The smallest decimal string that does not fit the type's underlying width.</summary>
     private static string OverflowText(Type enumType)
     {
         return Type.GetTypeCode(Enum.GetUnderlyingType(enumType)) switch
@@ -571,9 +563,7 @@ public class DefaultEnvarPropertyBinderTests
     {
         var exception = Assert.ThrowsAny<Exception>(() => Convert(text, enumType));
 
-        // The message must never quote the value the way the pre-2.0 parser did. A bare-substring check
-        // is meaningless for one-character inputs such as "," which occur naturally in prose, so the
-        // assertion is on the quoted form. ExceptionSafetyTests covers non-disclosure exhaustively.
+        // One-character inputs can occur in prose, so check the quoted form here.
         Assert.DoesNotContain($"'{text.Trim()}'", exception.Message, StringComparison.Ordinal);
     }
 
@@ -598,7 +588,7 @@ public class DefaultEnvarPropertyBinderTests
         AssertAccepts(enumType, "None", 0);
         AssertAccepts(enumType, "0", 0);
 
-        // Non-negative numeric combinations fully contained in the allowed mask.
+        // Numeric combinations inside the allowed mask.
         AssertAccepts(enumType, "3", 3);
         AssertAccepts(enumType, "5", 5);
         AssertAccepts(enumType, "7", 7);
@@ -614,7 +604,7 @@ public class DefaultEnvarPropertyBinderTests
         AssertRejects(enumType, "Unknown");
         AssertRejects(enumType, "Read,Unknown");
 
-        // 8 is a bit no declared member defines, so it is outside the allowed mask.
+        // Bit 8 is outside the allowed mask.
         AssertRejects(enumType, "8");
         AssertRejects(enumType, "9");
 
@@ -628,7 +618,7 @@ public class DefaultEnvarPropertyBinderTests
         AssertRejects(enumType, "Read,2");
         AssertRejects(enumType, "1,2");
 
-        // Empty list elements and a comma-only value.
+        // Empty list elements and comma-only input.
         AssertRejects(enumType, "Read,");
         AssertRejects(enumType, ",Read");
         AssertRejects(enumType, "Read,,Write");
@@ -652,8 +642,7 @@ public class DefaultEnvarPropertyBinderTests
 
         AssertRejects(typeof(FlagsWithNegative), "-1");
 
-        // The declared members' patterns are OR-ed into the allowed mask, and All contributes every bit,
-        // so the same bit pattern written as an unsigned decimal is inside the mask and is accepted.
+        // All = -1 contributes every bit to the allowed mask.
         AssertAccepts(typeof(FlagsWithNegative), "4294967295", -1);
     }
 
@@ -675,7 +664,7 @@ public class DefaultEnvarPropertyBinderTests
     [MemberData(nameof(PlainTypes))]
     public void NonFlags_RejectsListsSignsHexOverflowAndUndefinedValues(Type enumType)
     {
-        // A list is never accepted for a non-flags enum, even when every token is declared.
+        // Non-flags enums never accept lists.
         AssertRejects(enumType, "One,Two");
         AssertRejects(enumType, "One, Two");
         AssertRejects(enumType, ",");
@@ -703,8 +692,7 @@ public class DefaultEnvarPropertyBinderTests
 
         AssertRejects(typeof(PlainWithNegative), "-1");
 
-        // The same value written as the unsigned decimal representation of its bit pattern is a defined
-        // value and is therefore accepted.
+        // The unsigned bit pattern is a defined value.
         AssertAccepts(typeof(PlainWithNegative), "4294967295", -1);
     }
 
@@ -720,11 +708,11 @@ public class DefaultEnvarPropertyBinderTests
     [Fact]
     public void Flags_MixedCaseIsRejectedWhenCandidatesDisagreeAndAcceptedWhenTheyAgree()
     {
-        // read matches both Read = 1 and READ = 2, which have different bit patterns.
+        // "read" matches names with different values.
         AssertRejects(typeof(FlagsCollision), "read");
         AssertRejects(typeof(FlagsCollision), "rEaD");
 
-        // same matches both Same = 4 and SAME = 4, which have the same bit pattern.
+        // "same" matches names with the same value.
         AssertAccepts(typeof(FlagsCollision), "same", 4);
         AssertAccepts(typeof(FlagsCollision), "sAmE", 4);
     }
@@ -755,7 +743,7 @@ public class DefaultEnvarPropertyBinderTests
     [Fact]
     public void RejectionMessagesDoNotDiscloseTheValue()
     {
-        // A long, distinctive value: any echoing of the input would show up here.
+        // A distinctive value makes disclosure easy to detect.
         const string Sentinel = "QZXJKVWYPLMB-NOT-A-MEMBER-0000";
 
         var exception = Assert.ThrowsAny<Exception>(() => Convert(Sentinel, typeof(FlagsInt32)));

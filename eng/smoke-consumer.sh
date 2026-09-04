@@ -1,15 +1,7 @@
 #!/usr/bin/env bash
 #
-# Proves the README Quick Start is executable exactly as documented, from the candidate package, by a
-# project that has never seen this repository.
-#
-# The programs and the package-add commands are extracted from README.md rather than written here, so
-# the gate fails when the documentation drifts away from what works. Nothing is copied into the smoke
-# projects that a reader could not copy from the Quick Start.
-#
-# Restore is isolated on purpose. The package sources come from a NuGet.config written into the
-# temporary directory and passed explicitly, and packages land in a temporary global-packages folder, so
-# neither a user-level source nor an already-cached FriendlyEnvars can make this pass.
+# Builds and runs the README Quick Start against the candidate package.
+# Isolated sources and caches prevent repository or user state from hiding missing dependencies.
 #
 # Usage: eng/smoke-consumer.sh <nupkg>
 
@@ -55,9 +47,7 @@ CONFIG_FILE="$WORK_DIR/NuGet.config"
 mkdir -p "$PACKAGE_DIR" "$GLOBAL_PACKAGES"
 cp -- "$NUPKG" "$PACKAGE_DIR/"
 
-# The candidate package is reachable only by its exact id, and only from the local folder; everything
-# the framework supplies is reachable only from nuget.org. A package that is neither is unresolvable,
-# which is what keeps this a test of the documented dependency set.
+# Resolve FriendlyEnvars locally and framework packages only from nuget.org.
 cat > "$CONFIG_FILE" <<XML
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
@@ -83,8 +73,7 @@ cat > "$CONFIG_FILE" <<XML
 </configuration>
 XML
 
-# Prints the fenced block that immediately follows a marker line. Fails loudly when the marker is
-# missing or the block is empty, so a renamed section cannot silently reduce this gate to nothing.
+# Extract the non-empty fenced block after a marker.
 extract_block() {
     local marker="$1"
     local output
@@ -110,8 +99,7 @@ fail() {
     FAILURES=1
 }
 
-# Asserts the documented command block adds exactly the three documented packages at the documented
-# versions, and none of the packages the Quick Start says Hosting already supplies.
+# Require the documented dependency set and versions.
 check_documented_packages() {
     local tfm="$1" hosting_version="$2" annotations_version="$3" block="$4"
     local adds
@@ -133,7 +121,7 @@ check_documented_packages() {
         fi
     done
 
-    # Hosting supplies these; adding them directly is what the Quick Start tells the reader not to do.
+    # Hosting already supplies these packages.
     local forbidden
     for forbidden in "Microsoft.Extensions.DependencyInjection" "Microsoft.Extensions.Options"; do
         if grep -qE "^dotnet add package $forbidden( |\$)" "$block"; then
@@ -149,10 +137,7 @@ run_target() {
     extract_block "<!-- smoke-consumer: packages $tfm -->" > "$block"
     check_documented_packages "$tfm" "$hosting_version" "$annotations_version" "$block"
 
-    # Each scenario gets its own project, created by running the documented commands again, rather than
-    # a copy of one project. A copied project carries an obj/project.assets.json full of absolute paths
-    # belonging to the directory it was restored in, which is a difference this gate should not have to
-    # reason about.
+    # Use a fresh project so build artifacts cannot leak between scenarios.
     run_scenario "$tfm" "$block" "valid"
     run_scenario "$tfm" "$block" "invalid"
 }
@@ -163,8 +148,7 @@ run_scenario() {
 
     mkdir -p "$root"
 
-    # The documented commands run unchanged apart from --no-restore, which is what forces the restore
-    # below to be the only one, and therefore the only place package sources are decided.
+    # Delay restore so the explicit NuGet configuration is authoritative.
     sed 's/^dotnet add package .*/& --no-restore/' "$block" > "$root/create.sh"
 
     if ! (cd "$root" && bash -euo pipefail create.sh) > "$WORK_DIR/$tfm-$scenario-create.log" 2>&1; then
@@ -180,7 +164,6 @@ run_scenario() {
         return
     fi
 
-    # A ProjectReference would mean this is testing the working tree rather than the package.
     if grep -rq "ProjectReference" "$project" --include='*.csproj'; then
         fail "$tfm/$scenario smoke project references a repository source project"
         return
@@ -193,7 +176,7 @@ run_scenario() {
         return
     fi
 
-    # Only documented code compiles: whatever the template generated is removed first.
+    # Compile only the documented program.
     rm -f "$project"/*.cs
     extract_block "<!-- smoke-consumer: program $scenario -->" > "$project/Program.cs"
 
@@ -208,14 +191,7 @@ run_scenario() {
     local output="$WORK_DIR/$tfm-$scenario-run.log"
 
     if [[ "$scenario" == "valid" ]]; then
-        # The documented block is a shell script of export statements, so it is sourced verbatim rather
-        # than reinterpreted. It goes through a real file because bash 3.2, which is what macOS ships,
-        # reads nothing at all from a sourced process substitution - the variables are never set, with
-        # or without `set -a` - which silently produced an unset environment and a program that failed
-        # validation for the wrong reason.
-        #
-        # The subshell keeps the documented environment out of the invalid scenario and out of anything
-        # that runs after this script.
+        # A real file works on macOS Bash 3.2; the subshell contains the variables.
         local env_file="$WORK_DIR/$tfm-environment.sh"
         extract_block "<!-- smoke-consumer: environment valid -->" > "$env_file"
 
@@ -231,8 +207,7 @@ run_scenario() {
             return
         fi
 
-        # The documented output is asserted from the README rather than from literals kept here, so
-        # the block a reader is shown cannot drift away from what the program actually prints.
+        # Compare against the README, not duplicated literals.
         local expected_file="$WORK_DIR/$tfm-expected-output.txt"
         extract_block "<!-- smoke-consumer: output valid -->" > "$expected_file"
 
@@ -251,7 +226,6 @@ run_scenario() {
 
         echo "smoke-consumer: $tfm valid Quick Start ran and printed the documented values"
     else
-        # No environment is applied: the documented invalid program sets its own out-of-range value.
         (cd "$project" && dotnet run --no-build --no-restore --configuration Release) > "$output" 2>&1 || status=$?
 
         if [[ $status -eq 0 ]]; then
@@ -266,8 +240,7 @@ run_scenario() {
             return
         fi
 
-        # The README presents this block as an excerpt of the output, so each documented line must be
-        # present in the real output but is not required to be the whole of it.
+        # The README block is an excerpt, not the full stack trace.
         local excerpt_file="$WORK_DIR/$tfm-invalid-excerpt.txt"
         extract_block "<!-- smoke-consumer: output invalid -->" > "$excerpt_file"
 

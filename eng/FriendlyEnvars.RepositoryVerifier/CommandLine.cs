@@ -4,10 +4,6 @@ using System.Globalization;
 
 namespace FriendlyEnvars.RepositoryVerifier;
 
-/// <summary>
-/// Minimal, strict option parser. Options are <c>--name value</c> or <c>--name</c> for switches.
-/// Unknown or malformed options are hard errors so a mistyped gate argument can never be silently ignored.
-/// </summary>
 internal sealed class CommandLine
 {
     private readonly Dictionary<string, List<string>> _values = new(StringComparer.Ordinal);
@@ -110,10 +106,6 @@ internal sealed class CommandLine
         return list;
     }
 
-    /// <summary>
-    /// Fails when an option was supplied that the command never looked at, so that a gate cannot pass
-    /// because its arguments were quietly dropped.
-    /// </summary>
     public void EnsureAllConsumed()
     {
         var unknown = new List<string>();

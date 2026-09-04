@@ -7,16 +7,6 @@ using Xunit;
 
 namespace FriendlyEnvars.Tests;
 
-/// <summary>
-/// Cancellation is the caller's control flow, not a binding failure, so it must reach the caller as the
-/// very object that was thrown rather than being sanitised into an <see cref="EnvarsException"/>.
-/// </summary>
-/// <remarks>
-/// All three stages that call caller-supplied or reflected code are covered: the environment read, the
-/// binder, and the property setter. The setter case matters most, because reflection wraps whatever a
-/// setter throws in a <see cref="System.Reflection.TargetInvocationException"/>, so cancellation has to
-/// be unwrapped to be propagated unchanged.
-/// </remarks>
 public class CancellationTests : EnvarTestsBase
 {
     public class TextOptions
@@ -101,12 +91,11 @@ public class CancellationTests : EnvarTestsBase
 
             var thrown = Assert.Throws<OperationCanceledException>(() => factory.Create(Options.DefaultName));
 
-            // Unwrapped from the reflection wrapper, and the same object the setter threw.
+            // Preserve the instance and unwrap reflection.
             Assert.Same(cancellation, thrown);
             Assert.IsNotType<System.Reflection.TargetInvocationException>(thrown);
 
-            // Rethrown through ExceptionDispatchInfo rather than `throw cancellation`, which would erase
-            // the setter's frame and make the cancellation harder to trace back to its origin.
+            // ExceptionDispatchInfo preserves the setter frame.
             Assert.Contains("set_Value", thrown.StackTrace!, StringComparison.Ordinal);
         }
         finally
@@ -132,7 +121,7 @@ public class CancellationTests : EnvarTestsBase
     [Fact]
     public void ADerivedCancellationIsAlsoPropagatedUnchanged()
     {
-        // TaskCanceledException derives from OperationCanceledException and must behave identically.
+        // Derived cancellation types follow the same rule.
         using var source = new CancellationTokenSource();
         source.Cancel();
 
@@ -154,7 +143,6 @@ public class CancellationTests : EnvarTestsBase
         Assert.Equal(source.Token, thrown.CancellationToken);
     }
 
-    /// <summary>A derived cancellation type, standing in for TaskCanceledException.</summary>
     private sealed class TaskCanceledExceptionSubstitute : OperationCanceledException
     {
         public TaskCanceledExceptionSubstitute(CancellationToken token) : base(token)
@@ -162,7 +150,6 @@ public class CancellationTests : EnvarTestsBase
         }
     }
 
-    /// <summary>Returns the same value for every name.</summary>
     private sealed class StubReader : IEnvironmentVariableReader
     {
         private readonly string? _value;
@@ -178,7 +165,7 @@ public class CancellationTests : EnvarTestsBase
     [Fact]
     public void ANonCancellationFailureIsStillSanitised()
     {
-        // The cancellation filter must not accidentally let other exceptions through unwrapped.
+        // Non-cancellation failures remain sanitized.
         var services = new ServiceCollection();
         OptionsBuilderExtensions.BindEnvarsCore(
             services.AddOptions<TextOptions>(),

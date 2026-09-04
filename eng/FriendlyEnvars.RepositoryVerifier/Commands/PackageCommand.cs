@@ -7,11 +7,6 @@ using System.Xml.Linq;
 
 namespace FriendlyEnvars.RepositoryVerifier.Commands;
 
-/// <summary>
-/// Asserts NuGet package metadata read from the packed .nuspec, including that every declared metadata
-/// asset (icon, readme) is actually carried in the package. A declared-but-absent asset is the NU5046
-/// condition that made the reviewed package unbuildable.
-/// </summary>
 internal static class PackageCommand
 {
     public static void Run(CommandLine commandLine)
@@ -96,7 +91,6 @@ internal static class PackageCommand
         Console.WriteLine($"package OK: '{packagePath}' is {expectedId} {expectedVersion} with all declared metadata assets present.");
     }
 
-    /// <summary>Splits a repeatable "name=value" expectation, failing loudly on a malformed one.</summary>
     private static (string Name, string Value) SplitExpectation(string expectation, string optionName)
     {
         int separator = expectation.IndexOf('=', StringComparison.Ordinal);
@@ -109,10 +103,6 @@ internal static class PackageCommand
         return (expectation[..separator], expectation[(separator + 1)..]);
     }
 
-    /// <summary>
-    /// Verifies the nuspec's &lt;repository&gt; element: the expected URL and a 40-hex commit, which is
-    /// what lets a consumer trace the package back to the exact tree it was built from.
-    /// </summary>
     private static void VerifyRepository(NuGetPackage package, string expectedUrl, List<string> failures)
     {
         var repositories = package.Metadata
@@ -141,16 +131,6 @@ internal static class PackageCommand
         }
     }
 
-    /// <summary>
-    /// Enforces the accountability rules on the API-compatibility suppression file: one diagnostic and
-    /// one concrete target per entry, marked as a baseline suppression, and justified by a comment that
-    /// names the finding responsible.
-    /// </summary>
-    /// <remarks>
-    /// ApiCompat itself rejects a suppression that no longer corresponds to a real break, so "unused"
-    /// is already covered by the toolchain; what it cannot check is whether a human accounted for the
-    /// break at all. That is what this adds.
-    /// </remarks>
     private static void VerifySuppressions(string suppressionsFile, List<string> failures)
     {
         if (!File.Exists(suppressionsFile))
@@ -216,8 +196,7 @@ internal static class PackageCommand
                 failures.Add($"suppression for '{diagnosticId}' on '{target}' is missing <IsBaselineSuppression>true</IsBaselineSuppression>");
             }
 
-            // The justification must be the comment immediately before the entry, so it cannot drift
-            // away from what it justifies.
+            // Keep each justification next to its suppression.
             var previous = suppression.PreviousNode;
 
             while (previous is XText text && string.IsNullOrWhiteSpace(text.Value))
@@ -239,10 +218,6 @@ internal static class PackageCommand
         }
     }
 
-    /// <summary>
-    /// Checks the packaging properties that decide whether validation runs at all, and that no
-    /// compatibility diagnostic has been silenced through NoWarn.
-    /// </summary>
     private static void VerifyProject(string projectFile, string? expectedBaseline, string? suppressionsFileName, IReadOnlyList<string> expectedProperties, List<string> failures)
     {
         if (!File.Exists(projectFile))
@@ -253,10 +228,7 @@ internal static class PackageCommand
 
         var document = XDocument.Load(projectFile);
 
-        // MSBuild evaluates properties last-wins, so reading the first occurrence would let a later
-        // PropertyGroup silently override a value this gate believes it has checked. A conditional or
-        // repeated declaration is rejected outright rather than guessed at, because its effective value
-        // depends on the build rather than on the file.
+        // Conditional or repeated properties have no single value this file-level gate can verify.
         string? Property(string name)
         {
             var elements = document
@@ -324,13 +296,13 @@ internal static class PackageCommand
                  !suppressionItems.Any(include => string.Equals(
                      Path.GetFileName(include!.Replace('\\', '/')), suppressionsFileName, StringComparison.Ordinal)))
         {
-            // Otherwise the build could consume one file while this gate audits another.
+            // The build and this gate must use the same suppression file.
             failures.Add(
                 $"no <ApiCompatSuppressionFile> item points at '{suppressionsFileName}'; " +
                 $"declared: {string.Join(", ", suppressionItems)}");
         }
 
-        // Generating suppressions automatically would let a break be waved through by a rebuild.
+        // Suppressions must be reviewed and committed.
         if (Property("ApiCompatGenerateSuppressionFile") is not null)
         {
             failures.Add("<ApiCompatGenerateSuppressionFile> must not be set in committed configuration");
@@ -349,16 +321,6 @@ internal static class PackageCommand
         }
     }
 
-    /// <summary>
-    /// Asserts the package's declared dependency ids exactly, across every dependency group.
-    /// </summary>
-    /// <remarks>
-    /// This is the observable consequence of <c>PrivateAssets=all</c> on a development-only reference.
-    /// An analyzer that loses it stops being private and starts appearing here, which would force it on
-    /// every consumer of the library. An unexpected id therefore fails as loudly as a missing one, and
-    /// the check is on the packed artifact rather than on project text, so it cannot be satisfied by a
-    /// setting that the build did not actually apply.
-    /// </remarks>
     private static void VerifyDependencies(NuGetPackage package, IReadOnlyList<string> expected, List<string> failures)
     {
         var actual = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -397,10 +359,6 @@ internal static class PackageCommand
         }
     }
 
-    /// <summary>
-    /// Verifies a metadata element that names a file inside the package. The declared value must match
-    /// what the repository expects, and the named file must be carried exactly once.
-    /// </summary>
     private static void VerifyMetadataAsset(NuGetPackage package, string elementName, string? expectedValue, List<string> failures)
     {
         string? declared = package.GetMetadata(elementName);
