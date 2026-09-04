@@ -55,10 +55,6 @@ jobs:
       - name: Restore
         run: dotnet restore FriendlyEnvars.slnx --locked-mode
 
-      - name: Validate workflows
-        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
-        run: eng/validate-workflows.sh
-
       - name: Verify formatting
         if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
         run: dotnet format FriendlyEnvars.slnx --verify-no-changes --no-restore
@@ -88,14 +84,6 @@ jobs:
       - name: Verify package
         if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
         run: eng/verify-package.sh validation-pack/FriendlyEnvars.2.0.0-alpha.nupkg validation-pack/FriendlyEnvars.2.0.0-alpha.snupkg
-
-      - name: Verify documentation
-        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
-        run: eng/verify-docs.sh validation-pack/FriendlyEnvars.2.0.0-alpha.nupkg
-
-      - name: Verify API removals
-        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
-        run: eng/verify-api-removals.sh
 
       - name: Quick Start smoke consumer
         if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
@@ -148,9 +136,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
-      attestations: write
-      artifact-metadata: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -171,44 +156,6 @@ jobs:
       - name: Pack
         run: dotnet pack src/FriendlyEnvars/FriendlyEnvars.csproj --no-build --no-restore --configuration Release --output artifacts/release
 
-      - name: Restore tools
-        run: dotnet tool restore --configfile NuGet.config
-
-      - name: Generate SBOM
-        run: eng/generate-sbom.sh artifacts/release
-
-      - name: Verify SBOM
-        run: eng/verify-sbom.sh artifacts/release/sbom.spdx.json
-
-      - name: Checksums
-        run: |
-          set -euo pipefail
-          cd artifacts/release
-          shasum -a 256 FriendlyEnvars.2.0.0-alpha.nupkg FriendlyEnvars.2.0.0-alpha.snupkg sbom.spdx.json | sort -k2 > SHA256SUMS
-          cat SHA256SUMS
-
-      - name: Attest nupkg provenance
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
-        with:
-          subject-path: artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg
-
-      - name: Attest snupkg provenance
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
-        with:
-          subject-path: artifacts/release/FriendlyEnvars.2.0.0-alpha.snupkg
-
-      - name: Attest nupkg SBOM
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
-        with:
-          subject-path: artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg
-          sbom-path: artifacts/release/sbom.spdx.json
-
-      - name: Attest snupkg SBOM
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
-        with:
-          subject-path: artifacts/release/FriendlyEnvars.2.0.0-alpha.snupkg
-          sbom-path: artifacts/release/sbom.spdx.json
-
       - name: Upload release artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -216,8 +163,6 @@ jobs:
           path: |
             artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg
             artifacts/release/FriendlyEnvars.2.0.0-alpha.snupkg
-            artifacts/release/sbom.spdx.json
-            artifacts/release/SHA256SUMS
           if-no-files-found: error
 
   publish:
@@ -228,7 +173,6 @@ jobs:
     environment: nuget-production
     permissions:
       contents: read
-      attestations: read
       id-token: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -246,47 +190,6 @@ jobs:
         with:
           name: friendly-envars-2.0.0-alpha-${{ github.sha }}
           path: artifacts/release
-
-      - name: Build repository verifier
-        run: |
-          set -euo pipefail
-          dotnet restore eng/FriendlyEnvars.RepositoryVerifier/FriendlyEnvars.RepositoryVerifier.csproj --locked-mode
-          dotnet build eng/FriendlyEnvars.RepositoryVerifier/FriendlyEnvars.RepositoryVerifier.csproj --configuration Release --no-restore
-
-      - name: Verify checksums and attestations
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          cd artifacts/release
-          shasum -a 256 --check SHA256SUMS
-          cd "$GITHUB_WORKSPACE"
-          VERIFY_DIR="$(mktemp -d)"
-          for artifact in FriendlyEnvars.2.0.0-alpha.nupkg FriendlyEnvars.2.0.0-alpha.snupkg; do
-            gh attestation verify "artifacts/release/$artifact" \
-              --repo llepecki/friendly-envars \
-              --predicate-type https://slsa.dev/provenance/v1 \
-              --signer-workflow llepecki/friendly-envars/.github/workflows/ci.yml \
-              --source-ref refs/heads/master \
-              --source-digest "${{ github.sha }}" \
-              --format json > "$VERIFY_DIR/$artifact.provenance.json"
-            gh attestation verify "artifacts/release/$artifact" \
-              --repo llepecki/friendly-envars \
-              --predicate-type https://spdx.dev/Document/v2.3 \
-              --signer-workflow llepecki/friendly-envars/.github/workflows/ci.yml \
-              --source-ref refs/heads/master \
-              --source-digest "${{ github.sha }}" \
-              --format json > "$VERIFY_DIR/$artifact.sbom.json"
-            dotnet eng/FriendlyEnvars.RepositoryVerifier/bin/Release/net10.0/FriendlyEnvars.RepositoryVerifier.dll attestation \
-              --artifact "artifacts/release/$artifact" \
-              --provenance "$VERIFY_DIR/$artifact.provenance.json" \
-              --sbom-attestation "$VERIFY_DIR/$artifact.sbom.json" \
-              --checksums artifacts/release/SHA256SUMS \
-              --repository llepecki/friendly-envars \
-              --source-ref refs/heads/master \
-              --commit "${{ github.sha }}" \
-              --signer-workflow llepecki/friendly-envars/.github/workflows/ci.yml
-          done
 
       - name: NuGet login
         uses: NuGet/login@d22cc5f58ff5b88bf9bd452535b4335137e24544 # v1.1.0

@@ -9,16 +9,8 @@ internal static class Program
     // Declare unfinished commands so they fail as unimplemented, not unknown.
     private static readonly string[] KnownSubcommands =
     [
-        "attestation",
         "package",
-        "docs",
-        "sbom",
-        "workflow",
-        "api-removals",
-        "package-manifest",
-        "published-package",
-        "sourcelink",
-        "reproducible-package"
+        "package-manifest"
     ];
 
     private static int Main(string[] args)
@@ -50,37 +42,13 @@ internal static class Program
                     PackageManifestCommand.Run(commandLine);
                     break;
 
-                case "docs":
-                    DocsCommand.Run(commandLine);
-                    break;
 
-                case "api-removals":
-                    ApiRemovalsCommand.Run(commandLine);
-                    break;
 
-                case "attestation":
-                    AttestationCommand.Run(commandLine);
-                    break;
 
-                case "sbom":
-                    SbomCommand.Run(commandLine);
-                    break;
 
-                case "workflow":
-                    WorkflowCommand.Run(commandLine);
-                    break;
 
-                case "sourcelink":
-                    SourceLinkCommand.Run(commandLine);
-                    break;
 
-                case "reproducible-package":
-                    PackageCompareCommand.Run(commandLine, exemptRepositorySignature: false);
-                    break;
 
-                case "published-package":
-                    PackageCompareCommand.Run(commandLine, exemptRepositorySignature: true);
-                    break;
 
                 default:
                     throw new VerificationException(

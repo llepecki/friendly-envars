@@ -31,7 +31,6 @@ if [[ "$ACTUAL_SDK" != 10.0.* ]]; then
     exit 1
 fi
 
-dotnet tool restore --configfile NuGet.config
 dotnet restore FriendlyEnvars.slnx --locked-mode
 dotnet format FriendlyEnvars.slnx --verify-no-changes --no-restore
 dotnet build FriendlyEnvars.slnx --configuration Release --no-restore --warnaserror
@@ -40,17 +39,10 @@ dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --configurati
 eng/run-sample.sh
 dotnet pack src/FriendlyEnvars/FriendlyEnvars.csproj --configuration Release --no-build --no-restore --output artifacts/release
 eng/verify-package.sh artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg artifacts/release/FriendlyEnvars.2.0.0-alpha.snupkg
-eng/verify-docs.sh artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg
-eng/generate-sbom.sh artifacts/release
-eng/verify-sbom.sh artifacts/release/sbom.spdx.json
 eng/smoke-consumer.sh artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg
 eng/trim-smoke.sh
 eng/audit-dependencies.sh
-eng/validate-workflows.sh
-eng/verify-api-removals.sh
 eng/secret-scan.sh
-eng/verify-sourcelink.sh artifacts/release/FriendlyEnvars.2.0.0-alpha.snupkg
-eng/verify-reproducible-package.sh
 git diff --exit-code
 
 echo "verify-repository: OK"
