@@ -1,9 +1,9 @@
-# Weekly dependency updates. Both ecosystems are covered because a pinned action digest goes stale in
-# exactly the same way a pinned package version does, and REV-H02 pins every action by SHA.
+# Weekly dependency updates. Both ecosystems are covered because the workflow pins every action by
+# SHA, and a pinned digest goes stale exactly the way a pinned package version does.
 version: 2
 
 updates:
-  # Discovers every project under the repository root, including the lock files added by REV-M05.
+  # Discovers every project under the repository root, including the committed lock files.
   #
   # Known limitation, not a claim that this works end to end: Dependabot updates the lock file of the
   # project that declares the dependency, but not the lock files of projects that pick the same package

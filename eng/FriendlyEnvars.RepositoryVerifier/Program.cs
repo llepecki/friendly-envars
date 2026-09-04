@@ -6,7 +6,6 @@ namespace FriendlyEnvars.RepositoryVerifier;
 
 internal static class Program
 {
-    // Declare unfinished commands so they fail as unimplemented, not unknown.
     private static readonly string[] KnownSubcommands =
     [
         "package",
@@ -42,19 +41,9 @@ internal static class Program
                     PackageManifestCommand.Run(commandLine);
                     break;
 
-
-
-
-
-
-
-
-
                 default:
                     throw new VerificationException(
-                        Array.IndexOf(KnownSubcommands, subcommand) >= 0
-                            ? $"Subcommand '{subcommand}' is declared but not implemented in this revision."
-                            : $"Unknown subcommand '{subcommand}'. Expected one of: {string.Join(", ", KnownSubcommands)}.");
+                        $"Unknown subcommand '{subcommand}'. Expected one of: {string.Join(", ", KnownSubcommands)}.");
             }
 
             return 0;
