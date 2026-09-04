@@ -65,8 +65,7 @@ nunit-*.xml
 # MacOS
 .DS_Store
 
-# Environment variables. Everything .env-shaped is ignored so a real secrets file cannot be committed
-# by accident; the tracked .env.example documents the variable names with placeholder values only.
+# Environment variables
 .env*
 !.env.example
 
