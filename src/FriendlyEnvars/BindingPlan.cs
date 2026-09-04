@@ -100,11 +100,8 @@ internal sealed class BindingPlan
 
         foreach (var property in properties)
         {
-            // The complete per-property inspection is wrapped: attribute discovery, decoding the
-            // attribute's constructor arguments, reading the property type and inspecting the setter
-            // all touch metadata that hostile or malformed IL can make throw, and a raw reflection
-            // exception here would escape the sanitized failure contract. Failures the inspection
-            // itself raises deliberately pass through unchanged.
+            // Malformed or hostile metadata can throw anywhere in the inspection; nothing raw may
+            // escape the sanitized failure contract. Deliberate failures pass through unchanged.
             try
             {
                 CustomAttributeData? attributeData = FindEnvarAttributeData(property);
@@ -186,7 +183,6 @@ internal sealed class BindingPlan
     [StackTraceHidden]
     internal void Apply(object instance, IEnvarPropertyBinder binder, CultureInfo culture)
     {
-        // Only the library's sealed binder may use its precomputed path.
         bool isDefaultBinder = binder is DefaultEnvarPropertyBinder;
 
         foreach (var entry in _entries)
@@ -200,7 +196,6 @@ internal sealed class BindingPlan
 
             object? convertedValue;
 
-            // Keep the failure stage exact and sanitize all non-cancellation exceptions.
             try
             {
                 convertedValue = isDefaultBinder

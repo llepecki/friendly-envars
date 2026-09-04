@@ -577,7 +577,6 @@ public class DefaultEnvarPropertyBinderTests
         // A declared composite member.
         AssertAccepts(enumType, "ReadWrite", 3);
 
-        // A comma-separated list of declared names.
         AssertAccepts(enumType, "Read,Write", 3);
         AssertAccepts(enumType, " Read , Execute ", 5);
 
@@ -593,7 +592,6 @@ public class DefaultEnvarPropertyBinderTests
         AssertAccepts(enumType, "5", 5);
         AssertAccepts(enumType, "7", 7);
 
-        // The whole input is trimmed before parsing.
         AssertAccepts(enumType, " 3 ", 3);
     }
 

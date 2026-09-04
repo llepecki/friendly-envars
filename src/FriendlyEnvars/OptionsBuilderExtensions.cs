@@ -55,8 +55,10 @@ public static class OptionsBuilderExtensions
         var settings = new EnvarSettings(SharedDefaultBinder);
         configure?.Invoke(settings);
 
-        // Freeze mutable configuration before registration.
         var binder = settings.EnvarPropertyBinder;
+
+        // Clone first: ReadOnly would otherwise freeze the caller's own CultureInfo instance, and the
+        // snapshot must be independent of whatever the caller mutates afterwards.
         var culture = CultureInfo.ReadOnly((CultureInfo)settings.Culture.Clone());
         string optionsName = optionsBuilder.Name;
 

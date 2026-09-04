@@ -233,7 +233,6 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
 
             if (trimmed.Contains(',', StringComparison.Ordinal))
             {
-                // Lists accept declared names only.
                 result = 0;
 
                 foreach (string token in trimmed.Split(','))

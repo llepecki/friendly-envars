@@ -61,8 +61,7 @@ public class HostileMetadataTests
         var services = new ServiceCollection();
         var builder = services.AddOptions<object>();
 
-        // The public generic surface cannot name an emitted type, so the internal plan builder is
-        // exercised directly, exactly as BindEnvars would drive it.
+        // The generic surface cannot name an emitted type, so the plan builder is driven directly.
         var exception = Assert.Throws<EnvarsException>(() => BindingPlan.Build(
             hostileType, string.Empty, ProcessEnvironmentVariableReader.Instance, NullBindingPlanObserver.Instance));
 
@@ -92,10 +91,8 @@ public class HostileMetadataTests
     [Fact]
     public void AFailureDuringMetadataInspectionIsSanitizedNotPropagatedRaw()
     {
-        // Differential coverage for the wrapper itself: the blob test above happens to throw inside
-        // the attribute walk, which was already protected. This failure originates between that walk
-        // and the shape checks - the region the wrapper newly covers - so it fails against the
-        // unwrapped implementation.
+        // The blob test throws inside the already-protected attribute walk; this failure originates
+        // in the newly wrapped region, so it fails against the unwrapped implementation.
         var exception = Assert.Throws<EnvarsException>(() => BindingPlan.Build(
             typeof(PlainOptions), string.Empty, ProcessEnvironmentVariableReader.Instance, new ThrowingObserver()));
 
