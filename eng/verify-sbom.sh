@@ -28,9 +28,9 @@ fi
 run_verifier sbom \
     --sbom "$1" \
     --expect-name FriendlyEnvars \
-    --expect-version 2.0.0 \
-    --expect-file FriendlyEnvars.2.0.0.nupkg \
-    --expect-file FriendlyEnvars.2.0.0.snupkg \
+    --expect-version 2.0.0-alpha \
+    --expect-file FriendlyEnvars.2.0.0-alpha.nupkg \
+    --expect-file FriendlyEnvars.2.0.0-alpha.snupkg \
     --expect-dependency "Microsoft.Extensions.Options=8.0.2"
 
 echo "verify-sbom: OK"

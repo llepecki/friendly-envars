@@ -52,8 +52,8 @@ done
 
 for extension in nupkg snupkg; do
     run_verifier reproducible-package \
-        --left "$WORK_DIR/one/packages/FriendlyEnvars.2.0.0.$extension" \
-        --right "$WORK_DIR/two/packages/FriendlyEnvars.2.0.0.$extension"
+        --left "$WORK_DIR/one/packages/FriendlyEnvars.2.0.0-alpha.$extension" \
+        --right "$WORK_DIR/two/packages/FriendlyEnvars.2.0.0-alpha.$extension"
 done
 
 echo "verify-reproducible-package: OK (commit $COMMIT)"

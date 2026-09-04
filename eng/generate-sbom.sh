@@ -29,7 +29,7 @@ dotnet tool run sbom-tool generate \
     -b "$ARTIFACTS" \
     -bc . \
     -pn FriendlyEnvars \
-    -pv 2.0.0 \
+    -pv 2.0.0-alpha \
     -ps "Lukasz Lepecki" \
     -nsb https://github.com/llepecki/friendly-envars/sbom \
     -m "$WORK_DIR"

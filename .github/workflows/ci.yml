@@ -87,11 +87,11 @@ jobs:
 
       - name: Verify package
         if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
-        run: eng/verify-package.sh validation-pack/FriendlyEnvars.2.0.0.nupkg validation-pack/FriendlyEnvars.2.0.0.snupkg
+        run: eng/verify-package.sh validation-pack/FriendlyEnvars.2.0.0-alpha.nupkg validation-pack/FriendlyEnvars.2.0.0-alpha.snupkg
 
       - name: Verify documentation
         if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
-        run: eng/verify-docs.sh validation-pack/FriendlyEnvars.2.0.0.nupkg
+        run: eng/verify-docs.sh validation-pack/FriendlyEnvars.2.0.0-alpha.nupkg
 
       - name: Verify API removals
         if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
@@ -99,7 +99,7 @@ jobs:
 
       - name: Quick Start smoke consumer
         if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
-        run: eng/smoke-consumer.sh validation-pack/FriendlyEnvars.2.0.0.nupkg
+        run: eng/smoke-consumer.sh validation-pack/FriendlyEnvars.2.0.0-alpha.nupkg
 
       - name: Trim smoke
         if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
@@ -184,38 +184,38 @@ jobs:
         run: |
           set -euo pipefail
           cd artifacts/release
-          shasum -a 256 FriendlyEnvars.2.0.0.nupkg FriendlyEnvars.2.0.0.snupkg sbom.spdx.json | sort -k2 > SHA256SUMS
+          shasum -a 256 FriendlyEnvars.2.0.0-alpha.nupkg FriendlyEnvars.2.0.0-alpha.snupkg sbom.spdx.json | sort -k2 > SHA256SUMS
           cat SHA256SUMS
 
       - name: Attest nupkg provenance
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
         with:
-          subject-path: artifacts/release/FriendlyEnvars.2.0.0.nupkg
+          subject-path: artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg
 
       - name: Attest snupkg provenance
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
         with:
-          subject-path: artifacts/release/FriendlyEnvars.2.0.0.snupkg
+          subject-path: artifacts/release/FriendlyEnvars.2.0.0-alpha.snupkg
 
       - name: Attest nupkg SBOM
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
         with:
-          subject-path: artifacts/release/FriendlyEnvars.2.0.0.nupkg
+          subject-path: artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg
           sbom-path: artifacts/release/sbom.spdx.json
 
       - name: Attest snupkg SBOM
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
         with:
-          subject-path: artifacts/release/FriendlyEnvars.2.0.0.snupkg
+          subject-path: artifacts/release/FriendlyEnvars.2.0.0-alpha.snupkg
           sbom-path: artifacts/release/sbom.spdx.json
 
       - name: Upload release artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: friendly-envars-2.0.0-${{ github.sha }}
+          name: friendly-envars-2.0.0-alpha-${{ github.sha }}
           path: |
-            artifacts/release/FriendlyEnvars.2.0.0.nupkg
-            artifacts/release/FriendlyEnvars.2.0.0.snupkg
+            artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg
+            artifacts/release/FriendlyEnvars.2.0.0-alpha.snupkg
             artifacts/release/sbom.spdx.json
             artifacts/release/SHA256SUMS
           if-no-files-found: error
@@ -244,7 +244,7 @@ jobs:
       - name: Download release artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: friendly-envars-2.0.0-${{ github.sha }}
+          name: friendly-envars-2.0.0-alpha-${{ github.sha }}
           path: artifacts/release
 
       - name: Build repository verifier
@@ -262,7 +262,7 @@ jobs:
           shasum -a 256 --check SHA256SUMS
           cd "$GITHUB_WORKSPACE"
           VERIFY_DIR="$(mktemp -d)"
-          for artifact in FriendlyEnvars.2.0.0.nupkg FriendlyEnvars.2.0.0.snupkg; do
+          for artifact in FriendlyEnvars.2.0.0-alpha.nupkg FriendlyEnvars.2.0.0-alpha.snupkg; do
             gh attestation verify "artifacts/release/$artifact" \
               --repo llepecki/friendly-envars \
               --predicate-type https://slsa.dev/provenance/v1 \
@@ -295,4 +295,4 @@ jobs:
           user: ${{ secrets.NUGET_USER }}
 
       - name: Push package
-        run: dotnet nuget push artifacts/release/FriendlyEnvars.2.0.0.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+        run: dotnet nuget push artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json

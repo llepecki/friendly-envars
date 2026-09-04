@@ -39,17 +39,17 @@ dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --configurati
 dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --configuration Release --framework net10.0 --no-build --no-restore
 eng/run-sample.sh
 dotnet pack src/FriendlyEnvars/FriendlyEnvars.csproj --configuration Release --no-build --no-restore --output artifacts/release
-eng/verify-package.sh artifacts/release/FriendlyEnvars.2.0.0.nupkg artifacts/release/FriendlyEnvars.2.0.0.snupkg
-eng/verify-docs.sh artifacts/release/FriendlyEnvars.2.0.0.nupkg
+eng/verify-package.sh artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg artifacts/release/FriendlyEnvars.2.0.0-alpha.snupkg
+eng/verify-docs.sh artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg
 eng/generate-sbom.sh artifacts/release
 eng/verify-sbom.sh artifacts/release/sbom.spdx.json
-eng/smoke-consumer.sh artifacts/release/FriendlyEnvars.2.0.0.nupkg
+eng/smoke-consumer.sh artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg
 eng/trim-smoke.sh
 eng/audit-dependencies.sh
 eng/validate-workflows.sh
 eng/verify-api-removals.sh
 eng/secret-scan.sh
-eng/verify-sourcelink.sh artifacts/release/FriendlyEnvars.2.0.0.snupkg
+eng/verify-sourcelink.sh artifacts/release/FriendlyEnvars.2.0.0-alpha.snupkg
 eng/verify-reproducible-package.sh
 eng/compare-benchmarks.sh
 git diff --exit-code

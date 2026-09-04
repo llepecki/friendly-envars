@@ -401,9 +401,9 @@ internal static class WorkflowCommand
             {
                 pushIndex = i;
 
-                if (!run.Contains("FriendlyEnvars.2.0.0.nupkg", StringComparison.Ordinal))
+                if (!run.Contains("FriendlyEnvars.2.0.0-alpha.nupkg", StringComparison.Ordinal))
                 {
-                    failures.Add("publish must push exactly FriendlyEnvars.2.0.0.nupkg");
+                    failures.Add("publish must push exactly FriendlyEnvars.2.0.0-alpha.nupkg");
                 }
             }
         }

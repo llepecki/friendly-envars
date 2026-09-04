@@ -18,7 +18,7 @@ Choose one target. `Microsoft.Extensions.Hosting` supplies dependency injection 
 ```bash
 dotnet new console --framework net8.0 --output quickstart
 cd quickstart
-dotnet add package FriendlyEnvars --version 2.0.0
+dotnet add package FriendlyEnvars --version 2.0.0-alpha
 dotnet add package Microsoft.Extensions.Hosting --version 8.0.1
 dotnet add package Microsoft.Extensions.Options.DataAnnotations --version 8.0.0
 ```
@@ -29,7 +29,7 @@ dotnet add package Microsoft.Extensions.Options.DataAnnotations --version 8.0.0
 ```bash
 dotnet new console --framework net10.0 --output quickstart
 cd quickstart
-dotnet add package FriendlyEnvars --version 2.0.0
+dotnet add package FriendlyEnvars --version 2.0.0-alpha
 dotnet add package Microsoft.Extensions.Hosting --version 10.0.11
 dotnet add package Microsoft.Extensions.Options.DataAnnotations --version 10.0.11
 ```
