@@ -4,18 +4,9 @@ using System.Collections.Generic;
 
 namespace FriendlyEnvars.RepositoryVerifier;
 
-/// <summary>
-/// Subcommand dispatcher for the repository gates. Every <c>eng/*.sh</c> wrapper that has to inspect a
-/// binary, XML, JSON or YAML artifact delegates here so the assertions run against a parsed object model
-/// instead of ad hoc text matching.
-/// </summary>
 internal static class Program
 {
-    /// <summary>
-    /// The complete set of subcommands the specification requires this verifier to expose. Names are
-    /// listed even when not yet implemented so that an unimplemented gate fails loudly rather than
-    /// looking like a typo.
-    /// </summary>
+    // Declare unfinished commands so they fail as unimplemented, not unknown.
     private static readonly string[] KnownSubcommands =
     [
         "attestation",
@@ -66,6 +57,10 @@ internal static class Program
 
                 case "api-removals":
                     ApiRemovalsCommand.Run(commandLine);
+                    break;
+
+                case "benchmark":
+                    BenchmarkCommand.Run(commandLine);
                     break;
 
                 case "sourcelink":

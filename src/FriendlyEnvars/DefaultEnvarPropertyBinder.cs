@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -6,58 +7,49 @@ using System.Globalization;
 namespace FriendlyEnvars;
 
 /// <summary>
-/// The binder used unless a custom one is supplied. Converts the common BCL types directly, and falls
-/// back to the target type's <see cref="TypeConverter"/> for anything else.
+/// Converts supported .NET types and falls back to <see cref="TypeConverter"/>.
 /// </summary>
 /// <remarks>
-/// This type is stateless and therefore thread-safe. Note that its <see cref="TypeConverter"/> fallback
-/// passes the complete environment value to code the library does not control; see
-/// <see cref="IEnvarPropertyBinder"/> for what that implies.
+/// This type is stateless and thread-safe. A fallback converter receives the full environment value
+/// and must follow the security rules in <see cref="IEnvarPropertyBinder"/>.
 /// </remarks>
 public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="DefaultEnvarPropertyBinder"/> class.
+    /// Creates a default binder.
     /// </summary>
-    /// <remarks>
-    /// The type is stateless, so one instance can serve any number of registrations. FriendlyEnvars
-    /// shares a single instance internally when no custom binder is supplied.
-    /// </remarks>
     public DefaultEnvarPropertyBinder()
     {
     }
 
     /// <summary>
-    /// Converts an environment-variable value to <paramref name="targetType"/>.
+    /// Converts a raw environment value to <paramref name="targetType"/>.
     /// </summary>
-    /// <param name="value">The environment variable's value. May be an empty string.</param>
-    /// <param name="targetType">The property's declared type, including <see cref="Nullable{T}"/>.</param>
-    /// <param name="culture">The culture to parse numeric, date and time values with.</param>
-    /// <returns>The converted value.</returns>
-    /// <exception cref="FormatException">The value does not have the form the target type requires.</exception>
-    /// <exception cref="OverflowException">The value is outside the target type's range.</exception>
-    /// <exception cref="NotSupportedException">No conversion to the target type is available.</exception>
+    /// <param name="value">The captured value, which may be empty.</param>
+    /// <param name="targetType">The property's declared type.</param>
+    /// <param name="culture">The parsing culture.</param>
+    /// <returns>A value assignable to <paramref name="targetType"/>.</returns>
+    /// <exception cref="FormatException">The value has an invalid format.</exception>
+    /// <exception cref="OverflowException">The value exceeds the target type's range.</exception>
+    /// <exception cref="NotSupportedException">No converter is available.</exception>
     /// <remarks>
-    /// Handles the common BCL types directly and enums under an explicit grammar. Anything else falls
-    /// back to the target type's <see cref="TypeConverter"/>, which hands the complete value - secrets
-    /// included - to code this library does not control. A converter reached that way is as trusted as
-    /// a custom binder: it must be deterministic and thread-safe, and must not log or retain what it is
-    /// given. Supply an <see cref="IEnvarPropertyBinder"/> instead if you need control over which code
-    /// sees the value.
+    /// A fallback <see cref="TypeConverter"/> receives the full value. It must be deterministic,
+    /// thread-safe, and must not log or retain the value.
     /// </remarks>
     [StackTraceHidden]
     public object? Convert(string value, Type targetType, CultureInfo culture)
     {
-        var underlyingType = Nullable.GetUnderlyingType(targetType);
+        return ConvertPrecomputed(value, PrecomputedConversion.Create(targetType), culture);
+    }
 
-        if (underlyingType != null)
-        {
-            targetType = underlyingType;
-        }
+    [StackTraceHidden]
+    internal static object? ConvertPrecomputed(string value, PrecomputedConversion conversion, CultureInfo culture)
+    {
+        var targetType = conversion.ConversionType;
 
-        if (targetType.IsEnum)
+        if (conversion.EnumMetadata is { } enumMetadata)
         {
-            return EnumText.Parse(value, targetType);
+            return EnumText.Parse(value, targetType, enumMetadata);
         }
 
         return targetType switch
@@ -87,19 +79,6 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
         };
     }
 
-    /// <summary>
-    /// Last resort for a type this binder has no built-in rule for: whatever
-    /// <see cref="TypeDescriptor.GetConverter(Type)"/> returns for it.
-    /// </summary>
-    /// <remarks>
-    /// <b>This hands the complete environment value to third-party code.</b> The converter is chosen by
-    /// the target type - it may come from that type's own <see cref="TypeConverterAttribute"/>, from a
-    /// base type, or from a converter registered elsewhere in the process - and it is as trusted as any
-    /// custom binder: it receives the value verbatim, secrets included, and the library does not
-    /// sandbox, redact or inspect it. A converter reached this way must be deterministic and
-    /// thread-safe, and must not log or retain what it is given. Supply an
-    /// <see cref="IEnvarPropertyBinder"/> instead if you need control over which code sees the value.
-    /// </remarks>
     [StackTraceHidden]
     private static object? ConvertUsingTypeConverter(string value, Type targetType, CultureInfo culture)
     {
@@ -107,34 +86,52 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
         return converter.ConvertFrom(null, culture, value);
     }
 
-    /// <summary>
-    /// Parses enum text under an explicit grammar instead of delegating syntax decisions to
-    /// <see cref="Enum.Parse(Type, string, bool)"/>.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <see cref="Enum.Parse(Type, string, bool)"/> accepts comma-separated lists for every enum, accepts
-    /// signed and whitespace-padded numbers, and happily produces values whose bit pattern contains bits no
-    /// declared member defines. Configuration is not a place for that latitude: a typo should fail loudly at
-    /// startup rather than silently become an undeclared value.
-    /// </para>
-    /// <para>
-    /// Names are matched deterministically. An ordinal exact-case match wins outright. Otherwise every
-    /// ordinal case-insensitive match is collected, and the input is accepted only when all of those
-    /// candidates carry the same bit pattern, so a type declaring both <c>Read</c> and <c>READ</c> with
-    /// different values rejects the ambiguous <c>read</c> rather than picking one arbitrarily.
-    /// </para>
-    /// </remarks>
-    private static class EnumText
+    internal sealed class PrecomputedConversion
     {
+        private PrecomputedConversion(Type conversionType, EnumText.Metadata? enumMetadata)
+        {
+            ConversionType = conversionType;
+            EnumMetadata = enumMetadata;
+        }
+
+        internal Type ConversionType { get; }
+
+        internal EnumText.Metadata? EnumMetadata { get; }
+
+        internal static PrecomputedConversion Create(Type declaredType)
+        {
+            return Create(declaredType, enumMetadataCache: null);
+        }
+
         /// <summary>
-        /// Parses <paramref name="value"/> into <paramref name="enumType"/>.
+        /// Plan-building overload with an optional per-build cache, so many properties of the same
+        /// enum share one member table. The cache is scoped to one plan build; a process-wide cache
+        /// would root collectible assemblies and break unloadability.
         /// </summary>
-        /// <exception cref="FormatException">
-        /// The text does not satisfy the grammar. The message never contains the text, because an
-        /// environment value may be a secret.
-        /// </exception>
-        public static object Parse(string value, Type enumType)
+        internal static PrecomputedConversion Create(Type declaredType, Dictionary<Type, EnumText.Metadata>? enumMetadataCache)
+        {
+            var conversionType = Nullable.GetUnderlyingType(declaredType) ?? declaredType;
+
+            if (!conversionType.IsEnum)
+            {
+                return new PrecomputedConversion(conversionType, null);
+            }
+
+            EnumText.Metadata? metadata = null;
+
+            if (enumMetadataCache is null || !enumMetadataCache.TryGetValue(conversionType, out metadata))
+            {
+                metadata = EnumText.Metadata.Create(conversionType);
+                enumMetadataCache?[conversionType] = metadata;
+            }
+
+            return new PrecomputedConversion(conversionType, metadata);
+        }
+    }
+
+    internal static class EnumText
+    {
+        public static object Parse(string value, Type enumType, Metadata metadata)
         {
             string trimmed = value.Trim();
 
@@ -143,31 +140,100 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
                 throw Invalid(enumType, "the value is empty or whitespace only");
             }
 
-            var underlyingType = Enum.GetUnderlyingType(enumType);
-            var typeCode = Type.GetTypeCode(underlyingType);
-            string[] names = Enum.GetNames(enumType);
-            ulong[] patterns = GetBitPatterns(enumType, typeCode);
-
-            return enumType.IsDefined(typeof(FlagsAttribute), inherit: false)
-                ? ParseFlags(trimmed, enumType, typeCode, names, patterns)
-                : ParseNonFlags(trimmed, enumType, typeCode, names, patterns);
+            return metadata.IsFlags
+                ? ParseFlags(trimmed, enumType, metadata)
+                : ParseNonFlags(trimmed, enumType, metadata);
         }
 
-        private static object ParseFlags(string trimmed, Type enumType, TypeCode typeCode, string[] names, ulong[] patterns)
+        internal sealed class Metadata
         {
-            ulong allowedMask = 0;
-
-            foreach (ulong pattern in patterns)
+            private Metadata(TypeCode typeCode, string[] names, ulong[] patterns, bool isFlags, ulong allowedMask)
             {
-                allowedMask |= pattern;
+                TypeCode = typeCode;
+                Names = names;
+                Patterns = patterns;
+                IsFlags = isFlags;
+                AllowedMask = allowedMask;
             }
 
+            internal TypeCode TypeCode { get; }
+
+            internal string[] Names { get; }
+
+            internal ulong[] Patterns { get; }
+
+            internal bool IsFlags { get; }
+
+            internal ulong AllowedMask { get; }
+
+            internal static Metadata Create(Type enumType)
+            {
+                var typeCode = Type.GetTypeCode(Enum.GetUnderlyingType(enumType));
+                string[] names = Enum.GetNames(enumType);
+                ulong[] patterns = GetBitPatterns(enumType, typeCode);
+                ulong allowedMask = 0;
+
+                foreach (ulong pattern in patterns)
+                {
+                    allowedMask |= pattern;
+                }
+
+                return new Metadata(
+                    typeCode,
+                    names,
+                    patterns,
+                    enumType.IsDefined(typeof(FlagsAttribute), inherit: false),
+                    allowedMask);
+            }
+
+            private static ulong[] GetBitPatterns(Type enumType, TypeCode typeCode)
+            {
+                var values = Enum.GetValuesAsUnderlyingType(enumType);
+                var patterns = new ulong[values.Length];
+
+                for (int i = 0; i < values.Length; i++)
+                {
+                    object? underlyingValue = values.GetValue(i);
+
+                    if (underlyingValue is null)
+                    {
+                        throw new NotSupportedException($"Enum '{enumType.FullName}' exposed a null underlying value.");
+                    }
+
+                    patterns[i] = ToBitPattern(underlyingValue, typeCode);
+                }
+
+                return patterns;
+            }
+
+            private static ulong ToBitPattern(object underlyingValue, TypeCode typeCode)
+            {
+                return typeCode switch
+                {
+                    TypeCode.SByte => unchecked((ulong)(sbyte)underlyingValue) & byte.MaxValue,
+                    TypeCode.Byte => (byte)underlyingValue,
+                    TypeCode.Int16 => unchecked((ulong)(short)underlyingValue) & ushort.MaxValue,
+                    TypeCode.UInt16 => (ushort)underlyingValue,
+                    TypeCode.Int32 => unchecked((ulong)(int)underlyingValue) & uint.MaxValue,
+                    TypeCode.UInt32 => (uint)underlyingValue,
+                    TypeCode.Int64 => unchecked((ulong)(long)underlyingValue),
+                    TypeCode.UInt64 => (ulong)underlyingValue,
+                    _ => throw new NotSupportedException($"Enum underlying type code '{typeCode}' is not supported.")
+                };
+            }
+        }
+
+        private static object ParseFlags(string trimmed, Type enumType, Metadata metadata)
+        {
+            var typeCode = metadata.TypeCode;
+            string[] names = metadata.Names;
+            ulong[] patterns = metadata.Patterns;
+            ulong allowedMask = metadata.AllowedMask;
             ulong result;
 
             if (trimmed.Contains(',', StringComparison.Ordinal))
             {
-                // A list may contain declared names only. Numeric tokens are forbidden, which falls out of
-                // requiring every token to match a name.
+                // Lists accept declared names only.
                 result = 0;
 
                 foreach (string token in trimmed.Split(','))
@@ -189,7 +255,6 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
             }
             else if (TryMatchName(trimmed, names, patterns, out ulong singlePattern))
             {
-                // A single declared name is always acceptable, including one with a negative value.
                 result = singlePattern;
             }
             else
@@ -205,8 +270,12 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
             return ToEnum(result, enumType, typeCode);
         }
 
-        private static object ParseNonFlags(string trimmed, Type enumType, TypeCode typeCode, string[] names, ulong[] patterns)
+        private static object ParseNonFlags(string trimmed, Type enumType, Metadata metadata)
         {
+            var typeCode = metadata.TypeCode;
+            string[] names = metadata.Names;
+            ulong[] patterns = metadata.Patterns;
+
             if (trimmed.Contains(',', StringComparison.Ordinal))
             {
                 throw Invalid(enumType, "the type is not a flags enum, so a list is not accepted");
@@ -228,10 +297,6 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
             return Enum.ToObject(enumType, underlyingValue);
         }
 
-        /// <summary>
-        /// Accepts only ASCII decimal digits, and only a value that fits the underlying type's width.
-        /// A sign, a hexadecimal prefix, a digit separator or a non-ASCII digit is rejected outright.
-        /// </summary>
         private static ulong ParseUnsignedDecimal(string trimmed, Type enumType, TypeCode typeCode)
         {
             if (!IsAsciiDecimal(trimmed))
@@ -246,7 +311,7 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
             {
                 ulong digit = (ulong)(character - '0');
 
-                // Detect overflow before it happens, so a long run of digits cannot wrap into a valid value.
+                // Check before multiplication to prevent wraparound.
                 if (result > (ulong.MaxValue - digit) / 10)
                 {
                     throw Invalid(enumType, "the numeric value overflows the underlying type");
@@ -263,10 +328,6 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
             return result;
         }
 
-        /// <summary>
-        /// True when every character is an ASCII decimal digit. Deliberately rejects a leading sign, a
-        /// hexadecimal prefix, a digit separator and non-ASCII digits such as Arabic-Indic numerals.
-        /// </summary>
         private static bool IsAsciiDecimal(string text)
         {
             for (int i = 0; i < text.Length; i++)
@@ -305,8 +366,7 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
                     }
                     else if (patterns[i] != candidate)
                     {
-                        // Two declared members differ only by case and carry different values, so the input
-                        // is ambiguous and is rejected rather than resolved arbitrarily.
+                        // Never choose arbitrarily between case-insensitive aliases.
                         pattern = 0;
                         return false;
                     }
@@ -315,42 +375,6 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
 
             pattern = candidate;
             return found;
-        }
-
-        private static ulong[] GetBitPatterns(Type enumType, TypeCode typeCode)
-        {
-            var values = Enum.GetValuesAsUnderlyingType(enumType);
-            var patterns = new ulong[values.Length];
-
-            for (int i = 0; i < values.Length; i++)
-            {
-                object? underlyingValue = values.GetValue(i);
-
-                if (underlyingValue is null)
-                {
-                    throw new NotSupportedException($"Enum '{enumType.FullName}' exposed a null underlying value.");
-                }
-
-                patterns[i] = ToBitPattern(underlyingValue, typeCode);
-            }
-
-            return patterns;
-        }
-
-        private static ulong ToBitPattern(object underlyingValue, TypeCode typeCode)
-        {
-            return typeCode switch
-            {
-                TypeCode.SByte => unchecked((ulong)(sbyte)underlyingValue) & byte.MaxValue,
-                TypeCode.Byte => (byte)underlyingValue,
-                TypeCode.Int16 => unchecked((ulong)(short)underlyingValue) & ushort.MaxValue,
-                TypeCode.UInt16 => (ushort)underlyingValue,
-                TypeCode.Int32 => unchecked((ulong)(int)underlyingValue) & uint.MaxValue,
-                TypeCode.UInt32 => (uint)underlyingValue,
-                TypeCode.Int64 => unchecked((ulong)(long)underlyingValue),
-                TypeCode.UInt64 => (ulong)underlyingValue,
-                _ => throw new NotSupportedException($"Enum underlying type code '{typeCode}' is not supported.")
-            };
         }
 
         private static object ToUnderlying(ulong pattern, TypeCode typeCode)
@@ -386,10 +410,6 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
             };
         }
 
-        /// <summary>
-        /// Builds the rejection. The reason describes the grammar rule that was broken and never quotes the
-        /// input, so the message stays safe to log even when the value is a secret.
-        /// </summary>
         private static FormatException Invalid(Type enumType, string reason)
         {
             return new FormatException(string.Create(

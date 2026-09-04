@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <!--
+          Declared here rather than passed on the command line, so every restore - the plain solution
+          one and eng/trim-smoke.sh's runtime-specific one - evaluates the same graph and the committed
+          packages.lock.json satisfies locked mode for both. A CLI-only runtime produces a lock file
+          the other restore flavour rejects with NU1004.
+        -->
+        <RuntimeIdentifiers>linux-x64</RuntimeIdentifiers>
+        <!--
+          Published by eng/trim-smoke.sh with PublishTrimmed and TrimMode=link, so a trim warning from
+          the library surfaces here as a build error. The project itself stays warning-free too.
+        -->
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\FriendlyEnvars\FriendlyEnvars.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    </ItemGroup>
+</Project>

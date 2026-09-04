@@ -13,14 +13,10 @@
         <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
     </PropertyGroup>
     <PropertyGroup>
-        <!--
-          Deterministic, source-linked release artifacts. ContinuousIntegrationBuild is unconditional
-          rather than gated on a CI variable: eng/verify-reproducible-package.sh builds the same commit
-          in two different directories and requires byte-identical packages, which only holds when
-          source paths are normalised everywhere, and eng/verify-package.sh audits these properties and
-          rejects a conditional declaration because its effective value cannot be read from the file.
-        -->
+        <!-- Required for deterministic, source-linked packages from local and CI builds. -->
         <Deterministic>true</Deterministic>
+        <!-- Keep one lock file valid for solution restore and the linux-x64 trim test. -->
+        <RuntimeIdentifiers>linux-x64</RuntimeIdentifiers>
         <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
@@ -33,37 +29,22 @@
         <PackageReleaseNotes>
 ## Intentional breaking changes in 2.0.0
 
-- Exceptions are sealed and structured. EnvarsException is sealed and now carries FailureKind plus the
-  environment-variable name, options type and name, property, target type, culture, binder type and the
-  cause's type name. Library-generated failures never include the value, the cause's message or an inner
-  exception, so a leaked log cannot disclose a secret. OperationCanceledException is propagated
-  unchanged rather than wrapped.
-- The two options-blocking configuration methods are removed with no replacement. IOptions,
-  IOptionsSnapshot, IOptionsMonitor and IOptionsFactory all resolve normally.
-- Property shapes and environment-variable names are validated eagerly, while BindEnvars runs, instead
-  of lazily at options creation. A getter-only, static, indexed or non-public-setter property, or a name
-  that is empty, whitespace only, contains '=' or contains a control character, now fails at
-  registration even when the variable is absent.
+- EnvarsException is sealed and carries structured failure metadata. Library-generated failures omit
+  values, cause messages and inner exceptions. OperationCanceledException is propagated unchanged.
+- The options-blocking methods were removed. All standard Options abstractions resolve normally.
+- BindEnvars now validates property shapes and environment names, even when a variable is absent.
 - Registering FriendlyEnvars twice for the same options type and name throws InvalidOperationException.
-- Values are captured once, while BindEnvars runs, and every options instance is built from that
-  snapshot. Changing a variable afterwards no longer affects anything, including IOptionsSnapshot and
-  IOptionsMonitor.
-- Enum text follows an explicit grammar instead of Enum.Parse. Three differences from 1.1.0 are
-  deliberate: a non-flags enum rejects the numeric "-1" even when a member such as All = -1 is declared;
-  a non-flags enum rejects "Read,Write" even when ReadWrite = 3 is declared; and a flags enum rejects
-  negative numeric text while still accepting the corresponding declared member name. Names that differ
-  only by case are resolved deterministically, and a value whose bit pattern contains bits no declared
-  member defines is rejected.
-- BindEnvars&lt;T&gt; declares [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)]
-  on T, so trimmed applications preserve the properties reflection needs.
-- The configured culture is cloned and frozen when it is captured. A binder that mutates the culture it
-  is given now throws instead of silently changing how later values parse.
+- BindEnvars captures values once. Later environment changes do not affect any Options abstraction.
+- A non-flags enum rejects numeric "-1" even when All = -1 is declared.
+- A non-flags enum rejects "Read,Write" even when ReadWrite = 3 is declared.
+- A flags enum rejects negative numeric text but accepts the declared member name. Ambiguous names and
+  bit patterns with undeclared bits are also rejected.
+- BindEnvars&lt;T&gt; preserves public properties for trimmed applications.
+- BindEnvars clones and freezes the configured culture.
 
 ## Not new in 2.0
 
-- Empty environment variables ("") have been passed to the binder rather than treated as unset since
-  1.1.0. String properties become empty and non-string properties fail to convert. This is listed here
-  only because it is often mistaken for a 2.0 change.
+- Empty strings have been passed to the binder since 1.1.0. They are not a 2.0 change.
 
 ## Other changes
 
@@ -72,7 +53,7 @@
 - New package icon.
         </PackageReleaseNotes>
         <Authors>Lukasz Lepecki</Authors>
-        <Description>Simplify your .NET configuration. FriendlyEnvars maps environment variables directly to strongly-typed options classes - no JSON files, no complex setup. Just define your settings class and you're done. Fully compatible with IOptions, naturally integrates with existing codebase.</Description>
+        <Description>Binds environment variables to strongly typed .NET options.</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageTags>configuration;options;environment-variables</PackageTags>
