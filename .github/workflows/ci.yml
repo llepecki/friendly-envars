@@ -9,7 +9,8 @@ on:
 permissions: {}
 
 env:
-  # global.json pins the SDK with rollForward disabled, so both patches must be installed exactly.
+  # CI builds with these exact SDK versions for reproducibility. global.json only sets a floor
+  # (10.0.100, latestFeature roll-forward), so local machines may use any 10.0 SDK.
   DOTNET_SDK_VERSIONS: |
     8.0.424
     10.0.400
@@ -48,7 +49,7 @@ jobs:
           set -euo pipefail
           actual="$(dotnet --version)"
           if [[ "$actual" != "10.0.400" ]]; then
-            echo "global.json must select SDK 10.0.400, got $actual" >&2
+            echo "CI must build with the installed SDK 10.0.400, got $actual" >&2
             exit 1
           fi
 
