@@ -34,5 +34,11 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+        <!--
+          Pinned explicitly because the implicit reference PublishTrimmed adds tracks the SDK's own
+          feature band, which would make the committed lock file rewrite itself under every other
+          installed 10.0 SDK.
+        -->
+        <PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="8.0.30" PrivateAssets="all" />
     </ItemGroup>
 </Project>
