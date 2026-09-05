@@ -6,78 +6,197 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions: {}
+
+env:
+  # CI builds with these exact SDK versions for reproducibility. global.json only sets a floor
+  # (10.0.100, latestFeature roll-forward), so local machines may use any 10.0 SDK.
+  DOTNET_SDK_VERSIONS: |
+    8.0.424
+    10.0.400
+
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    name: Build and Test
+  validate:
+    name: Validate (${{ matrix.os }}, ${{ matrix.framework }})
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
-      actions: read
-      checks: write
-
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        framework: [ net8.0, net10.0 ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          # eng/secret-scan.sh scans the full history across all refs.
+          fetch-depth: 0
 
-      - name: Set Version Suffix
-        id: version
+      - name: Secret scan
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/secret-scan.sh
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: ${{ env.DOTNET_SDK_VERSIONS }}
+
+      - name: Verify SDK selection
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        shell: bash
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
-            echo "suffix=" >> $GITHUB_OUTPUT
-          else
-            echo "suffix=pr-${{ github.run_number }}" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          actual="$(dotnet --version)"
+          if [[ "$actual" != "10.0.400" ]]; then
+            echo "CI must build with the installed SDK 10.0.400, got $actual" >&2
+            exit 1
           fi
 
-      - name: Debug Version Info
-        run: |
-          echo "github.ref: ${{ github.ref }}"
-          echo "github.ref_name: ${{ github.ref_name }}"
-          echo "github.event_name: ${{ github.event_name }}"
-          echo "VersionSuffix: ${{ steps.version.outputs.suffix }}"
-
-      - name: Setup .NET 9 (for .slnx support)
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '9.0.x'
-
-      - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
       - name: Restore
-        run: dotnet restore --maxcpucount:1 FriendlyEnvars.slnx
+        run: dotnet restore FriendlyEnvars.slnx --locked-mode
+
+      - name: Verify formatting
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: dotnet format FriendlyEnvars.slnx --verify-no-changes --no-restore
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release --framework net8.0 --maxcpucount:1 -p:VersionSuffix="${{ steps.version.outputs.suffix }}" FriendlyEnvars.slnx
+        run: dotnet build FriendlyEnvars.slnx --no-restore --configuration Release --warnaserror
 
-      - name: Test
-        run: dotnet test --no-restore --no-build --configuration Release --framework net8.0 --maxcpucount:1 --verbosity normal --logger trx --results-directory TestResults FriendlyEnvars.slnx
+      - name: Full tests
+        if: matrix.os == 'ubuntu-latest'
+        run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework ${{ matrix.framework }}
 
-      - name: Publish Test Results
-        uses: dorny/test-reporter@v1
+      - name: Portability tests
+        run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework ${{ matrix.framework }} --filter "Category=Portability"
+
+      - name: Run sample
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/run-sample.sh
+
+      - name: Audit dependencies
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/audit-dependencies.sh
+
+      - name: Validation pack
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: dotnet pack src/FriendlyEnvars/FriendlyEnvars.csproj --no-build --no-restore --configuration Release --output validation-pack
+
+      - name: Verify package
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/verify-package.sh validation-pack/FriendlyEnvars.2.0.0-alpha.nupkg validation-pack/FriendlyEnvars.2.0.0-alpha.snupkg
+
+      - name: Quick Start smoke consumer
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/smoke-consumer.sh validation-pack/FriendlyEnvars.2.0.0-alpha.nupkg
+
+      - name: Trim smoke
+        if: matrix.os == 'ubuntu-latest' && matrix.framework == 'net10.0'
+        run: eng/trim-smoke.sh
+
+  report-tests:
+    name: Report tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: ${{ env.DOTNET_SDK_VERSIONS }}
+
+      - name: Restore
+        run: dotnet restore FriendlyEnvars.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build FriendlyEnvars.slnx --no-restore --configuration Release
+
+      - name: Test (net8.0)
+        run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework net8.0 --logger trx --results-directory TestResults
+
+      - name: Test (net10.0)
+        run: dotnet test tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj --no-restore --no-build --configuration Release --framework net10.0 --logger trx --results-directory TestResults
+
+      - name: Publish test results
+        uses: dorny/test-reporter@7b7927aa7da8b82e81e755810cb51f39941a2cc7 # v2.2.0
         if: always()
         with:
           name: Test Results
           path: TestResults/*.trx
           reporter: dotnet-trx
 
-      - name: Pack NuGet Package
-        run: dotnet pack --no-build --configuration Release --maxcpucount:1 -p:VersionSuffix="${{ steps.version.outputs.suffix }}" FriendlyEnvars.slnx
-
-      - name: Extract Package Version
-        id: extract-version
-        run: |
-          PACKAGE_PATH=$(ls src/FriendlyEnvars/bin/Release/*.nupkg | head -1)
-          PACKAGE_VERSION=$(basename "$PACKAGE_PATH" .nupkg | sed 's/FriendlyEnvars\.//')
-          echo "version=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
-          echo "Package version: $PACKAGE_VERSION"
-
-      - name: Upload NuGet Package
-        uses: actions/upload-artifact@v4
+  package:
+    name: Package
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          name: friendly-envars-${{ steps.extract-version.outputs.version }}
-          path: src/FriendlyEnvars/bin/Release/*.nupkg
+          persist-credentials: false
+          ref: ${{ github.sha }}
 
-      - name: Publish NuGet Package
-        if: github.ref == 'refs/heads/master'
-        run: dotnet nuget push src/FriendlyEnvars/bin/Release/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: ${{ env.DOTNET_SDK_VERSIONS }}
+
+      - name: Restore
+        run: dotnet restore FriendlyEnvars.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build FriendlyEnvars.slnx --no-restore --configuration Release --warnaserror
+
+      - name: Pack
+        run: dotnet pack src/FriendlyEnvars/FriendlyEnvars.csproj --no-build --no-restore --configuration Release --output artifacts/release
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: friendly-envars-2.0.0-alpha-${{ github.sha }}
+          path: |
+            artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg
+            artifacts/release/FriendlyEnvars.2.0.0-alpha.snupkg
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: package
+    runs-on: ubuntu-latest
+    environment: nuget-production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: ${{ env.DOTNET_SDK_VERSIONS }}
+
+      - name: Download release artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: friendly-envars-2.0.0-alpha-${{ github.sha }}
+          path: artifacts/release
+
+      - name: NuGet login
+        uses: NuGet/login@d22cc5f58ff5b88bf9bd452535b4335137e24544 # v1.1.0
+        id: nuget-login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push package
+        run: dotnet nuget push artifacts/release/FriendlyEnvars.2.0.0-alpha.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json

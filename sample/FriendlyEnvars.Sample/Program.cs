@@ -4,332 +4,277 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
+using System.Linq;
+using System.Threading.Tasks;
 
-// Sample demonstrating how to use FriendlyEnvars library
-Console.WriteLine("=== FriendlyEnvars Library Sample ===\n");
+// Exit 0 demonstrates valid binding. --invalid-validation exits 2 after startup validation fails.
+// eng/run-sample.sh checks both paths and verifies that no secret reaches the output.
 
-// Set up sample environment variables
-Console.WriteLine("Setting up sample environment variables...");
-Environment.SetEnvironmentVariable("DB_HOST", "localhost");
-Environment.SetEnvironmentVariable("DB_PORT", "5432");
-Environment.SetEnvironmentVariable("DB_NAME", "myapp_db");
-Environment.SetEnvironmentVariable("DB_USER", "admin");
-Environment.SetEnvironmentVariable("DB_PASSWORD", "secret123");
-Environment.SetEnvironmentVariable("DB_SSL_ENABLED", "true");
-Environment.SetEnvironmentVariable("DB_CONNECTION_TIMEOUT", "45"); // Will be converted to TimeSpan via custom binder
+bool invalidValidation = args.Contains("--invalid-validation", StringComparer.Ordinal);
 
-Environment.SetEnvironmentVariable("API_BASE_URL", "https://api.example.com");
-Environment.SetEnvironmentVariable("API_KEY", "abc123def456");
-Environment.SetEnvironmentVariable("API_TIMEOUT_SECONDS", "60");
-Environment.SetEnvironmentVariable("API_SUPPORT_EMAIL", "support@example.com");
-Environment.SetEnvironmentVariable("API_RETRY_COUNT", "5");
+SampleEnvironment.Apply(invalidValidation);
 
-Environment.SetEnvironmentVariable("FEATURE_LOGGING_ENABLED", "true");
-Environment.SetEnvironmentVariable("FEATURE_CACHING_ENABLED", "true");
-Environment.SetEnvironmentVariable("FEATURE_METRICS_ENABLED", "false");
-Environment.SetEnvironmentVariable("FEATURE_DEBUG_MODE", "true");
+// Disable host defaults to keep output and configuration sources deterministic.
+var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+{
+    Args = args,
+    DisableDefaults = true
+});
 
-// Example 1: Basic usage with default settings
-Console.WriteLine("=== Example 1: Basic Usage ===");
-var services1 = new ServiceCollection();
-services1.AddOptions<DatabaseConfig>()
-    .BindFromEnvars()
+builder.Services
+    .AddOptions<DatabaseSettings>()
+    .BindEnvars(static settings => settings.UseCustomEnvarPropertyBinder(new SecondsAwareBinder()))
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
-var provider1 = services1.BuildServiceProvider();
-var dbConfig = provider1.GetRequiredService<IOptions<DatabaseConfig>>().Value;
+builder.Services
+    .AddOptions<ApiSettings>()
+    .BindEnvars()
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
-Console.WriteLine($"Database Host: {dbConfig.Host}");
-Console.WriteLine($"Database Port: {dbConfig.Port}");
-Console.WriteLine($"Database Name: {dbConfig.DatabaseName}");
-Console.WriteLine($"SSL Enabled: {dbConfig.SslEnabled}");
-Console.WriteLine($"Connection Timeout: {dbConfig.ConnectionTimeout}");
-Console.WriteLine();
+builder.Services
+    .AddOptions<FeatureFlags>()
+    .BindEnvars();
 
-// Example 2: Using custom property binder
-Console.WriteLine("=== Example 2: Custom Property Binder ===");
-var services2 = new ServiceCollection();
-services2.AddOptions<DatabaseConfig>()
-    .BindFromEnvars(settings =>
+// Each named registration captures the current value.
+Environment.SetEnvironmentVariable("SAMPLE_REGION_ENDPOINT", "https://eu.example.com");
+
+builder.Services
+    .AddOptions<RegionSettings>("eu")
+    .BindEnvars();
+
+Environment.SetEnvironmentVariable("SAMPLE_REGION_ENDPOINT", "https://us.example.com");
+
+builder.Services
+    .AddOptions<RegionSettings>("us")
+    .BindEnvars();
+
+builder.Services.AddSingleton<ConfigurationReporter>();
+
+using var host = builder.Build();
+
+if (invalidValidation)
+{
+    try
     {
-        settings.UseCustomEnvarPropertyBinder(new CustomEnvarPropertyBinder());
-    })
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
-
-var provider2 = services2.BuildServiceProvider();
-var dbConfigCustom = provider2.GetRequiredService<IOptions<DatabaseConfig>>().Value;
-
-Console.WriteLine($"Connection Timeout (with custom binder): {dbConfigCustom.ConnectionTimeout}");
-Console.WriteLine();
-
-// Example 3: Multiple configuration classes
-Console.WriteLine("=== Example 3: Multiple Configuration Classes ===");
-var services3 = new ServiceCollection();
-
-// Register multiple configuration classes
-services3.AddOptions<DatabaseConfig>()
-    .BindFromEnvars()
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
-
-services3.AddOptions<ApiConfig>()
-    .BindFromEnvars()
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
-
-services3.AddOptions<FeatureFlags>()
-    .BindFromEnvars();
-
-var provider3 = services3.BuildServiceProvider();
-
-var apiConfig = provider3.GetRequiredService<IOptions<ApiConfig>>().Value;
-var featureFlags = provider3.GetRequiredService<IOptions<FeatureFlags>>().Value;
-
-Console.WriteLine($"API Base URL: {apiConfig.BaseUrl}");
-Console.WriteLine($"API Key: {apiConfig.ApiKey[..6]}***");
-Console.WriteLine($"API Timeout: {apiConfig.TimeoutSeconds}s");
-Console.WriteLine($"Support Email: {apiConfig.SupportEmail}");
-Console.WriteLine();
-
-Console.WriteLine("Feature Flags:");
-Console.WriteLine($"  Logging: {featureFlags.LoggingEnabled}");
-Console.WriteLine($"  Caching: {featureFlags.CachingEnabled}");
-Console.WriteLine($"  Metrics: {featureFlags.MetricsEnabled}");
-Console.WriteLine($"  Debug Mode: {featureFlags.DebugMode}");
-Console.WriteLine();
-
-// Example 4: Named options
-Console.WriteLine("=== Example 4: Named Options ===");
-Environment.SetEnvironmentVariable("CACHE_DB_HOST", "cache.example.com");
-Environment.SetEnvironmentVariable("CACHE_DB_PORT", "6379");
-Environment.SetEnvironmentVariable("CACHE_DB_NAME", "cache_db");
-Environment.SetEnvironmentVariable("CACHE_DB_USER", "cache_user");
-
-var services4 = new ServiceCollection();
-services4.AddOptions<CacheConfig>("cache")
-    .BindFromEnvars()
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
-
-var provider4 = services4.BuildServiceProvider();
-var cacheConfig = provider4.GetRequiredService<IOptionsFactory<CacheConfig>>().Create("cache");
-
-Console.WriteLine($"Cache Host: {cacheConfig.Host}");
-Console.WriteLine($"Cache Port: {cacheConfig.Port}");
-Console.WriteLine();
-
-// Example 5: Error handling
-Console.WriteLine("=== Example 5: Error Handling ===");
-try
-{
-    Environment.SetEnvironmentVariable("INVALID_PORT", "not_a_number");
-
-    var services5 = new ServiceCollection();
-    services5.AddOptions<InvalidConfig>()
-        .BindFromEnvars()
-        .ValidateDataAnnotations()
-        .ValidateOnStart();
-
-    var provider5 = services5.BuildServiceProvider();
-    var invalidConfig = provider5.GetRequiredService<IOptions<InvalidConfig>>().Value;
-}
-catch (EnvarsException ex)
-{
-    Console.WriteLine($"Caught EnvarsException: {ex.Message}");
-}
-catch (OptionsValidationException ex)
-{
-    Console.WriteLine($"Caught OptionsValidationException: {ex.Message}");
-}
-Console.WriteLine();
-
-// Example 6: Host Builder Integration
-Console.WriteLine("=== Example 6: Host Builder Integration ===");
-var hostBuilder = Host.CreateDefaultBuilder()
-    .ConfigureServices(services =>
+        await host.StartAsync();
+    }
+    catch (OptionsValidationException)
     {
-        services.AddOptions<DatabaseConfig>()
-            .BindFromEnvars()
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
+        Console.WriteLine(SampleOutput.ValidationFailed);
+        return 2;
+    }
 
-        services.AddOptions<ApiConfig>()
-            .BindFromEnvars()
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
+    Console.Error.WriteLine("Expected OptionsValidationException during StartAsync, but startup succeeded.");
+    return 1;
+}
 
-        // Add your application services here
-        services.AddSingleton<MyService>();
-    });
+await host.StartAsync();
 
-var host = hostBuilder.Build();
-var myService = host.Services.GetRequiredService<MyService>();
-myService.DoWork();
+host.Services.GetRequiredService<ConfigurationReporter>().Report();
 
-Console.WriteLine("\n=== Sample completed successfully! ===");
+await host.StopAsync();
 
-// Clean up environment variables
-Environment.SetEnvironmentVariable("DB_HOST", null);
-Environment.SetEnvironmentVariable("DB_PORT", null);
-Environment.SetEnvironmentVariable("DB_NAME", null);
-Environment.SetEnvironmentVariable("DB_USER", null);
-Environment.SetEnvironmentVariable("DB_PASSWORD", null);
-Environment.SetEnvironmentVariable("DB_SSL_ENABLED", null);
-Environment.SetEnvironmentVariable("DB_CONNECTION_TIMEOUT", null);
-Environment.SetEnvironmentVariable("API_BASE_URL", null);
-Environment.SetEnvironmentVariable("API_KEY", null);
-Environment.SetEnvironmentVariable("API_TIMEOUT_SECONDS", null);
-Environment.SetEnvironmentVariable("API_SUPPORT_EMAIL", null);
-Environment.SetEnvironmentVariable("API_RETRY_COUNT", null);
-Environment.SetEnvironmentVariable("FEATURE_LOGGING_ENABLED", null);
-Environment.SetEnvironmentVariable("FEATURE_CACHING_ENABLED", null);
-Environment.SetEnvironmentVariable("FEATURE_METRICS_ENABLED", null);
-Environment.SetEnvironmentVariable("FEATURE_DEBUG_MODE", null);
-Environment.SetEnvironmentVariable("CACHE_DB_HOST", null);
-Environment.SetEnvironmentVariable("CACHE_DB_PORT", null);
-Environment.SetEnvironmentVariable("CACHE_DB_NAME", null);
-Environment.SetEnvironmentVariable("CACHE_DB_USER", null);
-Environment.SetEnvironmentVariable("INVALID_PORT", null);
+Console.WriteLine(SampleOutput.Success);
+return 0;
 
-// 1. Basic Configuration Class with Environment Variables
-public class DatabaseConfig
+internal static class SampleOutput
+{
+    public const string Success = "Sample completed successfully!";
+    public const string ValidationFailed = "Validation failed during StartAsync as expected.";
+}
+
+internal static class SampleEnvironment
+{
+    // The output gate checks that no six-character fragment of these fixtures is printed.
+    private const string FakePassword = "QZXJKVWYPLMB0000";
+
+    private const string FakeApiKey = "MBLPYWVKJXZQ1111";
+
+    public static void Apply(bool invalidValidation)
+    {
+        SetIfAbsent("SAMPLE_DB_HOST", "db.example.com");
+        SetIfAbsent("SAMPLE_DB_NAME", "sample_db");
+        SetIfAbsent("SAMPLE_DB_USER", "sample_user");
+        SetIfAbsent("SAMPLE_DB_PASSWORD", FakePassword);
+        SetIfAbsent("SAMPLE_DB_SSL_ENABLED", "true");
+
+        SetIfAbsent("SAMPLE_DB_CONNECTION_TIMEOUT", "45");
+
+        SetIfAbsent("SAMPLE_API_BASE_URL", "https://api.example.com");
+        SetIfAbsent("SAMPLE_API_KEY", FakeApiKey);
+        SetIfAbsent("SAMPLE_API_TIMEOUT_SECONDS", "60");
+        SetIfAbsent("SAMPLE_API_SUPPORT_EMAIL", "support@example.com");
+
+        SetIfAbsent("SAMPLE_FEATURE_LOGGING", "true");
+        SetIfAbsent("SAMPLE_FEATURE_CACHING", "true");
+        SetIfAbsent("SAMPLE_FEATURE_METRICS", "false");
+
+        // The invalid value converts to int, then fails data-annotation validation.
+        Environment.SetEnvironmentVariable("SAMPLE_DB_PORT", invalidValidation ? "70000" : "5432");
+    }
+
+    private static void SetIfAbsent(string name, string value)
+    {
+        if (Environment.GetEnvironmentVariable(name) is null)
+        {
+            Environment.SetEnvironmentVariable(name, value);
+        }
+    }
+}
+
+/// <summary>
+/// Database options. A class avoids a record-generated <see cref="object.ToString"/> that could expose secrets.
+/// </summary>
+public class DatabaseSettings
 {
     [Required]
-    [Envar("DB_HOST")]
-    public string Host { get; set; } = string.Empty;
+    [Envar("SAMPLE_DB_HOST")]
+    public string Host { get; init; } = string.Empty;
 
-    [Required]
     [Range(1, 65535)]
-    [Envar("DB_PORT")]
-    public int Port { get; set; }
+    [Envar("SAMPLE_DB_PORT")]
+    public int Port { get; init; }
 
     [Required]
-    [Envar("DB_NAME")]
-    public string DatabaseName { get; set; } = string.Empty;
+    [Envar("SAMPLE_DB_NAME")]
+    public string DatabaseName { get; init; } = string.Empty;
 
     [Required]
-    [Envar("DB_USER")]
-    public string Username { get; set; } = string.Empty;
+    [Envar("SAMPLE_DB_USER")]
+    public string Username { get; init; } = string.Empty;
 
-    [Envar("DB_PASSWORD")]
-    public string? Password { get; set; }
+    [Envar("SAMPLE_DB_PASSWORD")]
+    public string? Password { get; init; }
 
-    [Envar("DB_SSL_ENABLED")]
-    public bool SslEnabled { get; set; } = true;
+    [Envar("SAMPLE_DB_SSL_ENABLED")]
+    public bool SslEnabled { get; init; } = true;
 
-    [Envar("DB_CONNECTION_TIMEOUT")]
-    public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromSeconds(30);
+    [Envar("SAMPLE_DB_CONNECTION_TIMEOUT")]
+    public TimeSpan ConnectionTimeout { get; init; } = TimeSpan.FromSeconds(30);
 }
 
-// 2. API Configuration with URL and Email validation
-public class ApiConfig
+/// <summary>API options that avoid record-generated secret output.</summary>
+public class ApiSettings
 {
     [Required]
     [Url]
-    [Envar("API_BASE_URL")]
-    public string BaseUrl { get; set; } = string.Empty;
+    [Envar("SAMPLE_API_BASE_URL")]
+    public string BaseUrl { get; init; } = string.Empty;
 
     [Required]
     [StringLength(100)]
-    [Envar("API_KEY")]
-    public string ApiKey { get; set; } = string.Empty;
+    [Envar("SAMPLE_API_KEY")]
+    public string ApiKey { get; init; } = string.Empty;
 
     [Range(1, 3600)]
-    [Envar("API_TIMEOUT_SECONDS")]
-    public int TimeoutSeconds { get; set; } = 30;
+    [Envar("SAMPLE_API_TIMEOUT_SECONDS")]
+    public int TimeoutSeconds { get; init; } = 30;
 
     [EmailAddress]
-    [Envar("API_SUPPORT_EMAIL")]
-    public string? SupportEmail { get; set; }
-
-    [Envar("API_RETRY_COUNT")]
-    public int RetryCount { get; set; } = 3;
+    [Envar("SAMPLE_API_SUPPORT_EMAIL")]
+    public string? SupportEmail { get; init; }
 }
 
-// 3. Feature Flags Configuration
+/// <summary>Options used to demonstrate named registrations.</summary>
+public class RegionSettings
+{
+    [Envar("SAMPLE_REGION_ENDPOINT")]
+    public string Endpoint { get; init; } = string.Empty;
+}
+
 public class FeatureFlags
 {
-    [Envar("FEATURE_LOGGING_ENABLED")]
-    public bool LoggingEnabled { get; set; } = true;
+    [Envar("SAMPLE_FEATURE_LOGGING")]
+    public bool LoggingEnabled { get; init; }
 
-    [Envar("FEATURE_CACHING_ENABLED")]
-    public bool CachingEnabled { get; set; } = false;
+    [Envar("SAMPLE_FEATURE_CACHING")]
+    public bool CachingEnabled { get; init; }
 
-    [Envar("FEATURE_METRICS_ENABLED")]
-    public bool MetricsEnabled { get; set; } = true;
-
-    [Envar("FEATURE_DEBUG_MODE")]
-    public bool DebugMode { get; set; } = false;
+    [Envar("SAMPLE_FEATURE_METRICS")]
+    public bool MetricsEnabled { get; init; }
 }
 
-// 4. Custom Property Binder Example
-public class CustomEnvarPropertyBinder : IEnvarPropertyBinder
+/// <summary>
+/// Parses a <see cref="TimeSpan"/> from seconds and delegates other types.
+/// </summary>
+/// <remarks>
+/// This stateless binder is safe for concurrent calls and does not retain or print values.
+/// </remarks>
+public sealed class SecondsAwareBinder : IEnvarPropertyBinder
 {
-    private readonly EnvarPropertyBinder _defaultBinder = new();
+    private static readonly DefaultEnvarPropertyBinder Default = new();
 
-    public object? Convert(string value, Type targetType)
+    public object? Convert(string value, Type targetType, CultureInfo culture)
     {
-        // Custom logic for specific types
-        if (targetType == typeof(TimeSpan))
+        if (targetType == typeof(TimeSpan) && int.TryParse(value, NumberStyles.Integer, culture, out int seconds))
         {
-            // Support both seconds (number) and TimeSpan format
-            if (int.TryParse(value, out int seconds))
-            {
-                return TimeSpan.FromSeconds(seconds);
-            }
+            return TimeSpan.FromSeconds(seconds);
         }
 
-        // Fall back to default behavior
-        return _defaultBinder.Convert(value, targetType);
+        return Default.Convert(value, targetType, culture);
     }
 }
 
-// 5. Cache Configuration for Named Options Example
-public class CacheConfig
+/// <summary>
+/// Reads the options and prints only non-secret values.
+/// </summary>
+public sealed class ConfigurationReporter
 {
-    [Required]
-    [Envar("CACHE_DB_HOST")]
-    public string Host { get; set; } = string.Empty;
+    private readonly DatabaseSettings _database;
+    private readonly ApiSettings _api;
+    private readonly FeatureFlags _features;
+    private readonly IOptionsFactory<RegionSettings> _regionFactory;
+    private readonly IOptionsMonitor<RegionSettings> _regionMonitor;
+    private readonly IServiceScopeFactory _scopeFactory;
 
-    [Required]
-    [Range(1, 65535)]
-    [Envar("CACHE_DB_PORT")]
-    public int Port { get; set; }
-
-    [Required]
-    [Envar("CACHE_DB_NAME")]
-    public string DatabaseName { get; set; } = string.Empty;
-
-    [Required]
-    [Envar("CACHE_DB_USER")]
-    public string Username { get; set; } = string.Empty;
-}
-
-// 6. Invalid Configuration for Error Handling Example
-public class InvalidConfig
-{
-    [Required]
-    [Envar("INVALID_PORT")]
-    public int Port { get; set; }
-}
-
-// 7. Sample Service for Host Builder Example
-public class MyService
-{
-    private readonly DatabaseConfig _dbConfig;
-    private readonly ApiConfig _apiConfig;
-
-    public MyService(IOptions<DatabaseConfig> dbConfig, IOptions<ApiConfig> apiConfig)
+    public ConfigurationReporter(
+        IOptions<DatabaseSettings> database,
+        IOptions<ApiSettings> api,
+        IOptions<FeatureFlags> features,
+        IOptionsFactory<RegionSettings> regionFactory,
+        IOptionsMonitor<RegionSettings> regionMonitor,
+        IServiceScopeFactory scopeFactory)
     {
-        _dbConfig = dbConfig.Value;
-        _apiConfig = apiConfig.Value;
+        _database = database.Value;
+        _api = api.Value;
+        _features = features.Value;
+        _regionFactory = regionFactory;
+        _regionMonitor = regionMonitor;
+        _scopeFactory = scopeFactory;
     }
 
-    public void DoWork()
+    public void Report()
     {
-        Console.WriteLine($"Service working with DB: {_dbConfig.Host}:{_dbConfig.Port}");
-        Console.WriteLine($"Service working with API: {_apiConfig.BaseUrl}");
+        Console.WriteLine($"Database endpoint : {_database.Host}:{_database.Port.ToString(CultureInfo.InvariantCulture)}");
+        Console.WriteLine($"Database name     : {_database.DatabaseName}");
+        Console.WriteLine($"Database user     : {_database.Username}");
+        Console.WriteLine($"Database password : {DescribeSecret(_database.Password)}");
+        Console.WriteLine($"TLS enabled       : {_database.SslEnabled}");
+        Console.WriteLine($"Connection timeout: {_database.ConnectionTimeout}");
+        Console.WriteLine($"API base URL      : {_api.BaseUrl}");
+        Console.WriteLine($"API key           : {DescribeSecret(_api.ApiKey)}");
+        Console.WriteLine($"API timeout       : {_api.TimeoutSeconds.ToString(CultureInfo.InvariantCulture)}s");
+        Console.WriteLine($"Support email     : {_api.SupportEmail}");
+        Console.WriteLine($"Logging enabled   : {_features.LoggingEnabled}");
+        Console.WriteLine($"Caching enabled   : {_features.CachingEnabled}");
+        Console.WriteLine($"Metrics enabled   : {_features.MetricsEnabled}");
+
+        using var scope = _scopeFactory.CreateScope();
+        var snapshot = scope.ServiceProvider.GetRequiredService<IOptionsSnapshot<RegionSettings>>();
+
+        foreach (string name in new[] { "eu", "us" })
+        {
+            Console.WriteLine(
+                $"Region '{name}'      : factory={_regionFactory.Create(name).Endpoint} " +
+                $"monitor={_regionMonitor.Get(name).Endpoint} snapshot={snapshot.Get(name).Endpoint}");
+        }
+    }
+
+    private static string DescribeSecret(string? secret)
+    {
+        return string.IsNullOrEmpty(secret) ? "<not set>" : "<set, redacted>";
     }
 }

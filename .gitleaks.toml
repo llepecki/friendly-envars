@@ -1,0 +1,24 @@
+# Reviewed allowlist for the full-history secret scan (eng/secret-scan.sh).
+#
+# Entries are for obvious fake fixtures only, scoped as tightly as the configuration allows: the
+# introducing commit, the file, and the match text together. Allowlist criteria are combined with OR
+# unless condition = "AND" is set; AND makes all three load-bearing, so the same text re-introduced in
+# any other commit or file is still reported. Measured both ways: with AND, a bogus commit SHA stops
+# excusing the finding and a re-introduction in a new commit is caught.
+#
+# Beware: an unrecognised key in this file is accepted silently rather than rejected, so a misspelled
+# option quietly weakens the allowlist to OR. Test any edit here in both directions - the excused
+# finding stays excused, and a re-introduction still fails the scan.
+
+[extend]
+# The default gitleaks ruleset stays in force; this file only carves out the fixtures below.
+useDefault = true
+
+# Pre-remediation sample placeholder ("abc123def456", alongside "secret123" and "api.example.com"),
+# removed by REV-H07. History cannot be rewritten, so the introducing commit is excused here.
+[[allowlists]]
+condition = "AND"
+commits = ["4132939056284249260e64a17033b307bfbcee1a"]
+paths = ['''sample/FriendlyEnvars\.Sample/Program\.cs''']
+regexTarget = "match"
+regexes = ['''API_KEY", "abc123def456''']

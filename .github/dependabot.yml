@@ -1,0 +1,34 @@
+# Weekly dependency updates. Both ecosystems are covered because the workflow pins every action by
+# SHA, and a pinned digest goes stale exactly the way a pinned package version does.
+version: 2
+
+updates:
+  # Discovers every project under the repository root, including the committed lock files.
+  #
+  # Known limitation, not a claim that this works end to end: Dependabot updates the lock file of the
+  # project that declares the dependency, but not the lock files of projects that pick the same package
+  # up through a ProjectReference. This repository has exactly that shape - the tests and sample both
+  # reference the library, and Microsoft.Extensions.Options appears in their lock files as well - so a
+  # NuGet update pull request will usually need a follow-up "dotnet restore" commit before the
+  # locked-mode CI restore passes. Tracked upstream as dependabot-core issue 10863, still open.
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "ci"

@@ -2,47 +2,69 @@
 
 [![CI](https://github.com/llepecki/friendly-envars/actions/workflows/ci.yml/badge.svg)](https://github.com/llepecki/friendly-envars/actions/workflows/ci.yml)
 
-Simple, type-safe environment variable configuration for .NET
+FriendlyEnvars binds environment variables to typed .NET options. Add `[Envar]` to each property you want to bind.
 
----
+## Quick start
 
-## 👀 Overview
+FriendlyEnvars targets .NET 8. The sample below runs on .NET 8 and .NET 10.
 
-Do you need to configure your .NET app *purely* via environment variables?
+### 1. Create the project
 
-**FriendlyEnvars** lets you bind them directly to strongly typed configuration classes.
+Choose one target. `Microsoft.Extensions.Hosting` supplies dependency injection and the Options APIs.
 
-- Clean, explicit configuration mapping using the `[Envar]` attribute.
-- Automatic type conversion, validation, and integration with the `IOptions<T>` pattern.
-- Environment variables are bound once, at startup.
+.NET 8:
 
-**Ideal for:** cloud-native apps, containerized deployments, microservices, or anywhere configuration comes from the environment.
+<!-- smoke-consumer: packages net8.0 -->
+```bash
+dotnet new console --framework net8.0 --output quickstart
+cd quickstart
+dotnet add package FriendlyEnvars --version 2.0.0-alpha
+dotnet add package Microsoft.Extensions.Hosting --version 8.0.1
+dotnet add package Microsoft.Extensions.Options.DataAnnotations --version 8.0.0
+```
 
----
+.NET 10:
 
-## 📝 Why FriendlyEnvars?
+<!-- smoke-consumer: packages net10.0 -->
+```bash
+dotnet new console --framework net10.0 --output quickstart
+cd quickstart
+dotnet add package FriendlyEnvars --version 2.0.0-alpha
+dotnet add package Microsoft.Extensions.Hosting --version 10.0.11
+dotnet add package Microsoft.Extensions.Options.DataAnnotations --version 10.0.11
+```
 
-- **Type safety**: Eliminates runtime configuration errors by mapping environment variables directly to typed properties.
-- **Built-in validation**: Leverages data annotation attributes like `[Required]`, `[Range]`, etc. automatically.
-- **No boilerplate**: No need to write manual parsing, error handling, or default value logic.
-- **Works with `IOptions`**: Smooth experience for modern .NET dependency injection patterns.
-- **Explicit & Discoverable:** Your configuration surface is crystal clear in the code.
+### 2. Set the variables
 
----
+<!-- smoke-consumer: environment valid -->
+```bash
+export DB_HOST=db.internal
+export DB_PORT=5432
+export DB_SSL_ENABLED=true
+export DB_CONNECTION_TIMEOUT=00:00:45
+```
 
-## 🚀 Quick Start
+### 3. Replace `Program.cs`
 
-### 1. Define Your Configuration Class
-
-Annotate properties you want loaded from environment variables. Properties must have a setter (`set` or `init`):
-
+<!-- smoke-consumer: program valid -->
 ```csharp
-public record DatabaseSettings
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.Threading;
+using System.Threading.Tasks;
+using FriendlyEnvars;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+
+public sealed record DatabaseSettings
 {
     [Envar("DB_HOST")]
+    [Required]
     public string Host { get; init; } = string.Empty;
 
     [Envar("DB_PORT")]
+    [Range(1, 65535)]
     public int Port { get; init; }
 
     [Envar("DB_SSL_ENABLED")]
@@ -51,183 +73,245 @@ public record DatabaseSettings
     [Envar("DB_CONNECTION_TIMEOUT")]
     public TimeSpan ConnectionTimeout { get; init; } = TimeSpan.FromSeconds(30);
 }
+
+public static class Program
+{
+    public static async Task Main()
+    {
+        HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+
+        builder.Services
+            .AddOptions<DatabaseSettings>()
+            .BindEnvars()
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        using IHost host = builder.Build();
+        await host.StartAsync(CancellationToken.None);
+
+        DatabaseSettings settings = host.Services.GetRequiredService<IOptions<DatabaseSettings>>().Value;
+
+        Console.WriteLine($"host={settings.Host}");
+        Console.WriteLine($"port={settings.Port}");
+        Console.WriteLine($"ssl={settings.SslEnabled}");
+        Console.WriteLine($"timeout={settings.ConnectionTimeout}");
+
+        await host.StopAsync(CancellationToken.None);
+    }
+}
 ```
 
-### 2. Register in DI
+Run it:
 
-Hook up configuration binding in your Startup.cs or DI setup:
+```bash
+dotnet run
+```
+
+<!-- smoke-consumer: output valid -->
+```text
+host=db.internal
+port=5432
+ssl=True
+timeout=00:00:45
+```
+
+Conversion is automatic. Data-annotation validation is optional and runs only when you call `ValidateDataAnnotations()`.
+
+### Validation failure example
+
+This complete program sets an invalid value. `ValidateOnStart()` makes host startup fail.
+
+<!-- smoke-consumer: program invalid -->
+```csharp
+using System;
+using System.ComponentModel.DataAnnotations;
+using System.Threading;
+using System.Threading.Tasks;
+using FriendlyEnvars;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+
+public sealed record PortSettings
+{
+    [Envar("DB_PORT")]
+    [Range(1, 65535)]
+    public int Port { get; init; } = 5432;
+}
+
+public static class Program
+{
+    public static async Task Main()
+    {
+        Environment.SetEnvironmentVariable("DB_PORT", "70000");
+
+        HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+
+        builder.Services
+            .AddOptions<PortSettings>()
+            .BindEnvars()
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        using IHost host = builder.Build();
+        await host.StartAsync(CancellationToken.None);
+    }
+}
+```
+
+The process exits with a nonzero code and reports:
+
+<!-- smoke-consumer: output invalid -->
+```text
+OptionsValidationException
+```
+
+## Behavior
+
+- Values are captured once when `BindEnvars()` is called. Later environment changes have no effect.
+- An unset variable leaves the property's existing value unchanged.
+- An empty string is a value. It is passed to the binder.
+- Properties must be public, non-indexed, instance properties with a public `set` or `init` accessor.
+- A second `BindEnvars()` call for the same options type and name throws `InvalidOperationException`.
+- Registrations run in order. The last source that sets a property wins.
+
+### Developing this repository
+
+Locked restore supports three host runtimes: linux-x64, osx-arm64 and win-x64. On another host
+(for example an Intel Mac or linux-arm64), `dotnet restore --locked-mode` fails with NU1004; add
+your host's runtime identifier to the two `RuntimeIdentifiers` lists and regenerate the lock files.
+
+### Testing without the process environment
+
+`UseEnvironmentSource` binds from a fixed snapshot, so tests never mutate process-global state:
 
 ```csharp
 services
     .AddOptions<DatabaseSettings>()
+    .BindEnvars(settings => settings.UseEnvironmentSource(new Dictionary<string, string?>
+    {
+        ["DB_HOST"] = "test-host",
+        ["DB_PORT"] = "5432"
+    }));
+```
+
+### Name prefixes
+
+`UseNamePrefix` prepends a prefix to every mapped name in one registration:
+
+```csharp
+services
+    .AddOptions<DatabaseSettings>()
+    .BindEnvars(settings => settings.UseNamePrefix("APP_"));
+// [Envar("DB_HOST")] now reads APP_DB_HOST.
+```
+
+### Supported types
+
+The default binder supports:
+
+- `string`, `char`, and `bool` (`true`/`false` only; `1`/`0` are rejected)
+- All integer and floating-point types, plus `decimal`
+- `Guid`, `Uri` (absolute only), `TimeSpan`, `DateTime` (declared kind preserved, so `Z` stays UTC),
+  `DateTimeOffset`, `DateOnly`, and `TimeOnly`
+- Enums, including `[Flags]` enums
+- Nullable forms of these types
+- Types with a `TypeConverter`
+
+Conversions use `InvariantCulture` unless you select another culture:
+
+```csharp
+using System.Globalization;
+
+services.AddOptions<DatabaseSettings>()
+    .BindEnvars(settings =>
+        settings.UseCulture(CultureInfo.GetCultureInfo("pl-PL")));
+```
+
+## Named options
+
+Each named `BindEnvars()` call captures its own values:
+
+```csharp
+public sealed class RegionSettings
+{
+    [Envar("REGION_ENDPOINT")]
+    public string Endpoint { get; init; } = string.Empty;
+}
+
+var services = new ServiceCollection();
+
+Environment.SetEnvironmentVariable("REGION_ENDPOINT", "https://eu.example.com");
+services.AddOptions<RegionSettings>("eu").BindEnvars();
+
+Environment.SetEnvironmentVariable("REGION_ENDPOINT", "https://us.example.com");
+services.AddOptions<RegionSettings>("us").BindEnvars();
+
+using ServiceProvider provider = services.BuildServiceProvider();
+
+var factory = provider.GetRequiredService<IOptionsFactory<RegionSettings>>();
+var monitor = provider.GetRequiredService<IOptionsMonitor<RegionSettings>>();
+
+using IServiceScope scope = provider.CreateScope();
+var snapshot = scope.ServiceProvider.GetRequiredService<IOptionsSnapshot<RegionSettings>>();
+
+Console.WriteLine(factory.Create("eu").Endpoint);
+Console.WriteLine(monitor.Get("us").Endpoint);
+Console.WriteLine(snapshot.Get("eu").Endpoint);
+```
+
+An unknown name gets the type's default values.
+
+## Precedence
+
+`BindEnvars()` uses the normal Options registration order. Environment values win here:
+
+```csharp
+services.AddOptions<ServerSettings>()
+    .Configure(options => options.Host = "from-code")
     .BindEnvars();
 ```
 
-### 3. Add Validation (Optional)
-
-Validate environment variables using standard data annotation attributes:
+Code wins here:
 
 ```csharp
-services
-    .AddOptions<DatabaseSettings>()
+services.AddOptions<ServerSettings>()
     .BindEnvars()
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
+    .Configure(options => options.Host = "from-code");
 ```
 
-### 4. Inject and Use Your Config
+An unset variable never overwrites an earlier value.
 
-```csharp
-public class MyService
-{
-    public MyService(IOptions<DatabaseSettings> settings)
-    {
-        var dbSettings = settings.Value;
-    }
-}
-```
+## Custom binders
 
-### 💡 Features
+Use `IEnvarPropertyBinder` when the default conversions are not enough. Register it with `UseCustomEnvarPropertyBinder()`.
 
-**Supported Types:**
+A custom binder or `TypeConverter` receives the full environment value. Treat that code as trusted:
 
-- `string`, `char`, `bool`
-- Numeric types: `byte`, `sbyte`, `short`, `ushort`, `int`, `uint`, `long`, `ulong`, `float`, `double`, `decimal`
-- `Guid`, `Uri`, `TimeSpan`, `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`
-- `Enum` (case-insensitive, including `[Flags]` enums)
-- Nullable versions of all above types
-- Any type with a `TypeConverter`
+- Keep it deterministic and thread-safe. One binder instance may serve concurrent options creation.
+- Do not log, print, cache, or retain input values.
+- Do not include a value in an `OperationCanceledException` message. Cancellation is propagated unchanged.
 
-**Additional Features:**
+Other binder exceptions are sanitized. FriendlyEnvars keeps the exception type, but not its message or object.
 
-- Automatic conversion using invariant culture (by default) or custom culture.
-- Custom parsing recipes via `IEnvarPropertyBinder` interface.
-- Validation using familiar `DataAnnotations` attributes.
+## Errors
 
-### ⚙️ Advanced Usage
+FriendlyEnvars throws `EnvarsException` for invalid properties, read failures, conversion failures, and assignment failures. Inspect `FailureKind` and the structured metadata instead of parsing `Message`.
 
-#### Parsing with a Specific Culture
+Library-generated exceptions never include the environment value or an inner exception. `OperationCanceledException` is propagated unchanged.
 
-By default, conversions use `CultureInfo.InvariantCulture` for predictable parsing. To handle locale-specific formats:
+## `IOptions` behavior
 
-```csharp
-using System.Globalization;
+`IOptions<T>`, `IOptionsSnapshot<T>`, `IOptionsMonitor<T>`, and `IOptionsFactory<T>` work normally. All use the values captured by `BindEnvars()`; snapshots and monitors do not re-read the environment.
 
-services.AddOptions<DatabaseSettings>()
-    .BindEnvars(settings => {
-        settings.UseCulture(CultureInfo.GetCultureInfo("en-US"));
-    });
-```
+## Version 2.0 changes
 
-#### Custom Type Conversion
+- `EnvarsException` is sealed and includes structured failure metadata.
+- The options-blocking APIs were removed.
+- Property shapes and environment names are validated by `BindEnvars()`.
+- Duplicate options type/name registrations are rejected.
+- Values are captured by `BindEnvars()`, not during options creation.
+- Enum parsing rejects invalid and ambiguous text.
+- `BindEnvars<T>` preserves public properties in trimmed applications.
+- The selected culture is cloned and made read-only.
 
-For complex types, implement `IEnvarPropertyBinder` to control parsing:
-
-```csharp
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-
-public record ConnectionString
-{
-    public string Host { get; init; } = string.Empty;
-    public int Port { get; init; }
-    public string User { get; init; } = string.Empty;
-    public string Password { get; init; } = string.Empty;
-}
-
-public class CustomEnvarPropertyBinder : IEnvarPropertyBinder
-{
-    private readonly DefaultEnvarPropertyBinder _defaultBinder = new();
-
-    public object? Convert(string value, Type targetType, CultureInfo culture)
-    {
-        if (targetType == typeof(ConnectionString))
-        {
-            return ParseConnectionString(value);
-        }
-
-        return _defaultBinder.Convert(value, targetType, culture);
-    }
-
-    private static ConnectionString ParseConnectionString(string connectionString)
-    {
-        var pairs = connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries);
-        var values = new Dictionary<string, string>();
-
-        foreach (var pair in pairs)
-        {
-            var parts = pair.Split('=', 2);
-            if (parts.Length == 2)
-            {
-                values[parts[0].Trim()] = parts[1].Trim();
-            }
-        }
-
-        return new ConnectionString
-        {
-            Host = values.GetValueOrDefault("Host", "localhost"),
-            Port = int.Parse(values.GetValueOrDefault("Port", "5432")),
-            User = values.GetValueOrDefault("User", ""),
-            Password = values.GetValueOrDefault("Password", "")
-        };
-    }
-}
-```
-
-Usage with environment variable `CONNECTION_STRING=Host=localhost;Port=5432;User=Joe;Password=Joe12`:
-
-```csharp
-public record DatabaseSettings
-{
-    [Envar("CONNECTION_STRING")]
-    public ConnectionString Connection { get; init; } = new();
-}
-```
-
-Then, configure the binder:
-
-```csharp
-services.AddOptions<DatabaseSettings>()
-    .BindEnvars(settings =>
-    {
-        settings.UseCustomEnvarPropertyBinder(new CustomEnvarPropertyBinder());
-    });
-```
-
-#### Working with `IOptionsSnapshot` and `IOptionsMonitor`
-
-By default, `IOptionsSnapshot<T>` and `IOptionsMonitor<T>` are enabled and will always reflect the values from app startup.
-Environment variable configs do not refresh at runtime.
-
-You can disable support for `IOptionsSnapshot<T>` and `IOptionsMonitor<T>` if you want to ensure only `IOptions<T>` is used:
-
-```csharp
-services.AddOptions<DatabaseSettings>()
-    .BindEnvars(settings =>
-    {
-        settings
-            .BlockOptionsSnapshot()
-            .BlockOptionsMonitor();
-    });
-```
-
-### ⚠️ Breaking Changes
-
-#### Empty Environment Variables (v2.x)
-
-Previously, environment variables set to an empty string (`""`) were treated the same as unset variables — the property would retain its default value. Now, empty strings are passed to the binder. This means:
-
-- `string` properties will be set to `""` instead of keeping their default.
-- Non-string properties (e.g., `int`, `bool`) will throw a `FormatException` wrapped in `EnvarsException` if the environment variable is empty.
-
-If you relied on the old behavior of ignoring empty values, either unset the variable entirely or use a custom `IEnvarPropertyBinder` to handle empty strings.
-
-### ⚠️ Limitations
-
-- No runtime refresh: environment variables are read once on application startup.
-- `IOptionsSnapshot` and `IOptionsMonitor` are enabled by default as read-only views, but can be disabled if needed.
-
----
-
-With FriendlyEnvars, configuration is easy, explicit, and safe.
+Empty strings have been passed to the binder since version 1.1.0. Unset the variable or use a custom binder if you need different behavior.

@@ -494,4 +494,272 @@ public class DefaultEnvarPropertyBinderTests
             Assert.Equal(expected, result);
         }
     }
+
+    // Enum grammar across all underlying types, flags modes, and case collisions.
+
+    private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
+
+    // All flags fixtures use the same members and 0b111 allowed mask.
+    [Flags] public enum FlagsByte : byte { None = 0, Read = 1, Write = 2, ReadWrite = 3, Execute = 4 }
+    [Flags] public enum FlagsSByte : sbyte { None = 0, Read = 1, Write = 2, ReadWrite = 3, Execute = 4 }
+    [Flags] public enum FlagsInt16 : short { None = 0, Read = 1, Write = 2, ReadWrite = 3, Execute = 4 }
+    [Flags] public enum FlagsUInt16 : ushort { None = 0, Read = 1, Write = 2, ReadWrite = 3, Execute = 4 }
+    [Flags] public enum FlagsInt32 : int { None = 0, Read = 1, Write = 2, ReadWrite = 3, Execute = 4 }
+    [Flags] public enum FlagsUInt32 : uint { None = 0, Read = 1, Write = 2, ReadWrite = 3, Execute = 4 }
+    [Flags] public enum FlagsInt64 : long { None = 0, Read = 1, Write = 2, ReadWrite = 3, Execute = 4 }
+    [Flags] public enum FlagsUInt64 : ulong { None = 0, Read = 1, Write = 2, ReadWrite = 3, Execute = 4 }
+
+    public enum PlainByte : byte { Zero = 0, One = 1, Two = 2 }
+    public enum PlainSByte : sbyte { Zero = 0, One = 1, Two = 2 }
+    public enum PlainInt16 : short { Zero = 0, One = 1, Two = 2 }
+    public enum PlainUInt16 : ushort { Zero = 0, One = 1, Two = 2 }
+    public enum PlainInt32 : int { Zero = 0, One = 1, Two = 2 }
+    public enum PlainUInt32 : uint { Zero = 0, One = 1, Two = 2 }
+    public enum PlainInt64 : long { Zero = 0, One = 1, Two = 2 }
+    public enum PlainUInt64 : ulong { Zero = 0, One = 1, Two = 2 }
+
+    [Flags] public enum FlagsWithNegative { None = 0, Read = 1, Write = 2, All = -1 }
+
+    public enum PlainWithNegative { All = -1, Zero = 0, One = 1 }
+
+    [Flags] public enum FlagsCollision { Read = 1, READ = 2, Same = 4, SAME = 4 }
+
+    public enum PlainCollision { Read = 1, READ = 2, Same = 4, SAME = 4 }
+
+    public static TheoryData<Type> FlagsTypes() =>
+    [
+        typeof(FlagsByte), typeof(FlagsSByte), typeof(FlagsInt16), typeof(FlagsUInt16),
+        typeof(FlagsInt32), typeof(FlagsUInt32), typeof(FlagsInt64), typeof(FlagsUInt64)
+    ];
+
+    public static TheoryData<Type> PlainTypes() =>
+    [
+        typeof(PlainByte), typeof(PlainSByte), typeof(PlainInt16), typeof(PlainUInt16),
+        typeof(PlainInt32), typeof(PlainUInt32), typeof(PlainInt64), typeof(PlainUInt64)
+    ];
+
+    private static string OverflowText(Type enumType)
+    {
+        return Type.GetTypeCode(Enum.GetUnderlyingType(enumType)) switch
+        {
+            TypeCode.SByte or TypeCode.Byte => "256",
+            TypeCode.Int16 or TypeCode.UInt16 => "65536",
+            TypeCode.Int32 or TypeCode.UInt32 => "4294967296",
+            _ => "18446744073709551616"
+        };
+    }
+
+    private object Convert(string text, Type enumType) => _binder.Convert(text, enumType, Invariant)!;
+
+    private void AssertAccepts(Type enumType, string text, long expected)
+    {
+        object result = Convert(text, enumType);
+
+        Assert.IsType(enumType, result);
+        Assert.Equal(expected, System.Convert.ToInt64(result, Invariant));
+    }
+
+    private void AssertRejects(Type enumType, string text)
+    {
+        var exception = Assert.ThrowsAny<Exception>(() => Convert(text, enumType));
+
+        // One-character inputs can occur in prose, so check the quoted form here.
+        Assert.DoesNotContain($"'{text.Trim()}'", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [MemberData(nameof(FlagsTypes))]
+    public void Flags_AcceptsDeclaredNamesCompositesAndListsOnEveryUnderlyingType(Type enumType)
+    {
+        AssertAccepts(enumType, "Read", 1);
+        AssertAccepts(enumType, "Write", 2);
+
+        // A declared composite member.
+        AssertAccepts(enumType, "ReadWrite", 3);
+
+        AssertAccepts(enumType, "Read,Write", 3);
+        AssertAccepts(enumType, " Read , Execute ", 5);
+
+        // Case-insensitive when no exact-case match exists.
+        AssertAccepts(enumType, "read", 1);
+        AssertAccepts(enumType, "READ", 1);
+
+        AssertAccepts(enumType, "None", 0);
+        AssertAccepts(enumType, "0", 0);
+
+        // Numeric combinations inside the allowed mask.
+        AssertAccepts(enumType, "3", 3);
+        AssertAccepts(enumType, "5", 5);
+        AssertAccepts(enumType, "7", 7);
+
+        AssertAccepts(enumType, " 3 ", 3);
+    }
+
+    [Theory]
+    [MemberData(nameof(FlagsTypes))]
+    public void Flags_RejectsEverythingOutsideTheGrammarOnEveryUnderlyingType(Type enumType)
+    {
+        AssertRejects(enumType, "Unknown");
+        AssertRejects(enumType, "Read,Unknown");
+
+        // Bit 8 is outside the allowed mask.
+        AssertRejects(enumType, "8");
+        AssertRejects(enumType, "9");
+
+        AssertRejects(enumType, "-1");
+        AssertRejects(enumType, "+3");
+        AssertRejects(enumType, "0x3");
+        AssertRejects(enumType, "3.0");
+        AssertRejects(enumType, "1_0");
+
+        // Numeric tokens are forbidden inside a list.
+        AssertRejects(enumType, "Read,2");
+        AssertRejects(enumType, "1,2");
+
+        // Empty list elements and comma-only input.
+        AssertRejects(enumType, "Read,");
+        AssertRejects(enumType, ",Read");
+        AssertRejects(enumType, "Read,,Write");
+        AssertRejects(enumType, ",");
+
+        AssertRejects(enumType, string.Empty);
+        AssertRejects(enumType, "   ");
+        AssertRejects(enumType, "\t\n");
+
+        AssertRejects(enumType, OverflowText(enumType));
+
+        // Non-ASCII digits are not decimal digits for this grammar.
+        AssertRejects(enumType, "٣");
+    }
+
+    [Fact]
+    public void Flags_AcceptsADeclaredNegativeMemberByNameButRejectsItWrittenAsANegativeNumber()
+    {
+        AssertAccepts(typeof(FlagsWithNegative), "All", -1);
+        AssertAccepts(typeof(FlagsWithNegative), "all", -1);
+
+        AssertRejects(typeof(FlagsWithNegative), "-1");
+
+        // All = -1 contributes every bit to the allowed mask.
+        AssertAccepts(typeof(FlagsWithNegative), "4294967295", -1);
+    }
+
+    [Theory]
+    [MemberData(nameof(PlainTypes))]
+    public void NonFlags_AcceptsOneDeclaredNameOrOneUnsignedDecimalDefinedValue(Type enumType)
+    {
+        AssertAccepts(enumType, "One", 1);
+        AssertAccepts(enumType, "one", 1);
+        AssertAccepts(enumType, "ONE", 1);
+        AssertAccepts(enumType, " Two ", 2);
+
+        AssertAccepts(enumType, "0", 0);
+        AssertAccepts(enumType, "1", 1);
+        AssertAccepts(enumType, "2", 2);
+    }
+
+    [Theory]
+    [MemberData(nameof(PlainTypes))]
+    public void NonFlags_RejectsListsSignsHexOverflowAndUndefinedValues(Type enumType)
+    {
+        // Non-flags enums never accept lists.
+        AssertRejects(enumType, "One,Two");
+        AssertRejects(enumType, "One, Two");
+        AssertRejects(enumType, ",");
+
+        AssertRejects(enumType, "+1");
+        AssertRejects(enumType, "-1");
+        AssertRejects(enumType, "0x1");
+        AssertRejects(enumType, "1.0");
+
+        // 3 converts cleanly but is not a declared member.
+        AssertRejects(enumType, "3");
+        AssertRejects(enumType, "Unknown");
+
+        AssertRejects(enumType, string.Empty);
+        AssertRejects(enumType, "   ");
+
+        AssertRejects(enumType, OverflowText(enumType));
+    }
+
+    [Fact]
+    public void NonFlags_AcceptsADeclaredNegativeMemberByNameButRejectsItWrittenNumericallyWithASign()
+    {
+        AssertAccepts(typeof(PlainWithNegative), "All", -1);
+        AssertAccepts(typeof(PlainWithNegative), "all", -1);
+
+        AssertRejects(typeof(PlainWithNegative), "-1");
+
+        // The unsigned bit pattern is a defined value.
+        AssertAccepts(typeof(PlainWithNegative), "4294967295", -1);
+    }
+
+    [Fact]
+    public void Flags_ExactCaseNamesSelectTheirOwnValue()
+    {
+        AssertAccepts(typeof(FlagsCollision), "Read", 1);
+        AssertAccepts(typeof(FlagsCollision), "READ", 2);
+        AssertAccepts(typeof(FlagsCollision), "Same", 4);
+        AssertAccepts(typeof(FlagsCollision), "SAME", 4);
+    }
+
+    [Fact]
+    public void Flags_MixedCaseIsRejectedWhenCandidatesDisagreeAndAcceptedWhenTheyAgree()
+    {
+        // "read" matches names with different values.
+        AssertRejects(typeof(FlagsCollision), "read");
+        AssertRejects(typeof(FlagsCollision), "rEaD");
+
+        // "same" matches names with the same value.
+        AssertAccepts(typeof(FlagsCollision), "same", 4);
+        AssertAccepts(typeof(FlagsCollision), "sAmE", 4);
+    }
+
+    [Fact]
+    public void FlagsListTokens_FollowTheSameCollisionRule()
+    {
+        AssertAccepts(typeof(FlagsCollision), "Read,Same", 5);
+        AssertAccepts(typeof(FlagsCollision), "READ,same", 6);
+        AssertAccepts(typeof(FlagsCollision), "Read,READ,SAME", 7);
+
+        AssertRejects(typeof(FlagsCollision), "read,Same");
+        AssertRejects(typeof(FlagsCollision), "Same,read");
+    }
+
+    [Fact]
+    public void NonFlagsNames_FollowTheSameCollisionRule()
+    {
+        AssertAccepts(typeof(PlainCollision), "Read", 1);
+        AssertAccepts(typeof(PlainCollision), "READ", 2);
+        AssertAccepts(typeof(PlainCollision), "Same", 4);
+        AssertAccepts(typeof(PlainCollision), "SAME", 4);
+
+        AssertAccepts(typeof(PlainCollision), "same", 4);
+        AssertRejects(typeof(PlainCollision), "read");
+    }
+
+    [Fact]
+    public void RejectionMessagesDoNotDiscloseTheValue()
+    {
+        // A distinctive value makes disclosure easy to detect.
+        const string Sentinel = "QZXJKVWYPLMB-NOT-A-MEMBER-0000";
+
+        var exception = Assert.ThrowsAny<Exception>(() => Convert(Sentinel, typeof(FlagsInt32)));
+
+        Assert.DoesNotContain(Sentinel, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(Sentinel, exception.ToString(), StringComparison.Ordinal);
+        Assert.Contains(typeof(FlagsInt32).FullName!, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NullableEnumsUseTheSameGrammar()
+    {
+        // Boxing a Nullable<T> yields the underlying value, so the result is a FlagsInt32.
+        object result = Convert("Read,Write", typeof(FlagsInt32?));
+
+        Assert.IsType<FlagsInt32>(result);
+        Assert.Equal(FlagsInt32.ReadWrite, (FlagsInt32)result);
+
+        AssertRejects(typeof(FlagsInt32?), "Read,2");
+    }
 }

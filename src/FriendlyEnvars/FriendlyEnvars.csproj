@@ -3,6 +3,7 @@
         <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <LangVersion>latest</LangVersion>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <AnalysisLevel>latest</AnalysisLevel>
         <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
@@ -12,34 +13,60 @@
         <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
     </PropertyGroup>
     <PropertyGroup>
+        <!-- Required for deterministic, source-linked packages from local and CI builds. -->
+        <Deterministic>true</Deterministic>
+        <!-- Keep the lock file valid on the supported host runtimes: linux-x64, osx-arm64, win-x64. -->
+        <RuntimeIdentifiers>linux-x64;osx-arm64;win-x64</RuntimeIdentifiers>
+        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    </PropertyGroup>
+    <PropertyGroup>
         <PackageId>FriendlyEnvars</PackageId>
-        <VersionPrefix>1.1.0</VersionPrefix>
+        <VersionPrefix>2.0.0</VersionPrefix>
+        <!-- Prerelease for the 2.0 review; the 2.0.0 release removes the suffix. -->
+        <VersionSuffix>alpha</VersionSuffix>
         <PackageReleaseNotes>
-## Breaking Changes
-- Empty environment variables ("") are now passed to the binder instead of being treated as unset. String properties will be set to "" instead of keeping defaults; non-string properties will throw FormatException for empty values.
+## Intentional breaking changes in 2.0.0
 
-## New Features
-- [Flags] enum support for combined values (e.g., "Read, Write")
+- EnvarsException is sealed and carries structured failure metadata. Library-generated failures omit
+  values, cause messages and inner exceptions. OperationCanceledException is propagated unchanged.
+- The options-blocking methods were removed. All standard Options abstractions resolve normally.
+- BindEnvars now validates property shapes and environment names, even when a variable is absent.
+- Registering FriendlyEnvars twice for the same options type and name throws InvalidOperationException.
+- BindEnvars captures values once. Later environment changes do not affect any Options abstraction.
+- A non-flags enum rejects numeric "-1" even when All = -1 is declared.
+- A non-flags enum rejects "Read,Write" even when ReadWrite = 3 is declared.
+- A flags enum rejects negative numeric text but accepts the declared member name. Ambiguous names and
+  bit patterns with undeclared bits are also rejected.
+- BindEnvars&lt;T&gt; preserves public properties for trimmed applications.
+- BindEnvars clones and freezes the configured culture.
 
-## Bug Fixes
-- Fixed enum values not being returned from the binder
-- TypeConverter conversions now respect the configured culture setting
-- Changed char parsing to use char.Parse() for clearer error messages
+## Not new in 2.0
 
-## Performance
-- Added property metadata caching to avoid repeated reflection
+- Empty strings have been passed to the binder since 1.1.0. They are not a 2.0 change.
+
+## Other changes
+
+- XML documentation is generated and packaged.
+- Lambdas that capture no state are marked static, reducing allocations.
+- New package icon.
         </PackageReleaseNotes>
         <Authors>Lukasz Lepecki</Authors>
-        <Description>Simplify your .NET configuration. FriendlyEnvars maps environment variables directly to strongly-typed options classes - no JSON files, no complex setup. Just define your settings class and you're done. Fully compatible with IOptions, naturally integrates with existing codebase.</Description>
+        <Description>Binds environment variables to strongly typed .NET options.</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageTags>configuration;options;environment-variables</PackageTags>
-        <Copyright>Copyright (c) 2025 Lukasz Lepecki</Copyright>
+        <Copyright>Copyright (c) 2026 Lukasz Lepecki</Copyright>
         <PackageProjectUrl>https://github.com/llepecki/friendly-envars</PackageProjectUrl>
         <RepositoryUrl>https://github.com/llepecki/friendly-envars</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
-        <PackageIcon>icon.png</PackageIcon>
+        <PackageIcon>icon-v2.png</PackageIcon>
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+        <EnablePackageValidation>true</EnablePackageValidation>
+        <PackageValidationBaselineVersion>1.1.0</PackageValidationBaselineVersion>
     </PropertyGroup>
     <ItemGroup>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
@@ -47,22 +74,29 @@
         </AssemblyAttribute>
     </ItemGroup>
     <ItemGroup>
+        <ApiCompatSuppressionFile Include="CompatibilitySuppressions.xml" />
+    </ItemGroup>
+    <ItemGroup>
         <None Include="..\..\README.md" Pack="true" PackagePath="\" />
-        <None Include="..\..\resources\icon.png" Pack="true" PackagePath="\" />
+        <None Include="..\..\resources\icon-v2.png" Pack="true" PackagePath="\" />
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="SonarAnalyzer.CSharp" Version="10.15.0.120848">
+        <PackageReference Include="SonarAnalyzer.CSharp" Version="10.19.0.132793">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Roslynator.Analyzers" Version="4.14.0">
+        <PackageReference Include="Roslynator.Analyzers" Version="4.15.0">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Nullable.Extended.Analyzer" Version="1.15.6581">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>

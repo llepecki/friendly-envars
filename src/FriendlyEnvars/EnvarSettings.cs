@@ -1,213 +1,108 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 
 namespace FriendlyEnvars;
 
 /// <summary>
-/// Configuration settings for environment variable binding behavior.
+/// Configures value conversion for <c>BindEnvars</c>.
 /// </summary>
 /// <remarks>
-/// This record provides a fluent API for configuring how environment variables
-/// are bound to configuration objects, including type conversion, culture settings,
-/// and options pattern behavior.
+/// Each method updates and returns the same instance. Changes made after <c>BindEnvars</c> returns have
+/// no effect.
 /// </remarks>
-/// <example>
-/// <code>
-/// using System.Globalization;
-///
-/// services.AddOptions&lt;DatabaseSettings&gt;()
-///     .BindEnvars(settings =&gt;
-///     {
-///         settings
-///             .UseCustomEnvarPropertyBinder(new CustomBinder())
-///             .UseCulture(CultureInfo.GetCultureInfo("en-US"));
-///     });
-/// </code>
-/// </example>
 public sealed record EnvarSettings
 {
-    /// <summary>
-    /// Initializes a new instance of the <see cref="EnvarSettings"/> class with default values.
-    /// </summary>
-    /// <remarks>
-    /// Default configuration:
-    /// <list type="bullet">
-    /// <item><description>Uses <see cref="DefaultEnvarPropertyBinder"/> for type conversion</description></item>
-    /// <item><description>Uses <see cref="CultureInfo.InvariantCulture"/> for parsing</description></item>
-    /// <item><description>Enables <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/></description></item>
-    /// <item><description>Enables <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/></description></item>
-    /// </list>
-    /// </remarks>
-    internal EnvarSettings()
+    internal EnvarSettings(IEnvarPropertyBinder defaultBinder)
     {
-        EnvarPropertyBinder = new DefaultEnvarPropertyBinder();
+        EnvarPropertyBinder = defaultBinder;
         Culture = CultureInfo.InvariantCulture;
-        IsOptionsSnapshotAllowed = true;
-        IsOptionsMonitorAllowed = true;
     }
 
     /// <summary>
-    /// Configures a custom property binder for type conversion.
+    /// Uses a custom value converter.
     /// </summary>
-    /// <param name="binder">The custom property binder to use for type conversion.</param>
-    /// <returns>A new <see cref="EnvarSettings"/> instance with the specified binder.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="binder"/> is null.</exception>
-    /// <example>
-    /// <para>Custom binder class:</para>
-    /// <code>
-    /// public class CustomBinder : IEnvarPropertyBinder
-    /// {
-    ///     public object? Convert(string value, Type targetType, CultureInfo culture)
-    ///     {
-    ///         // Custom conversion logic
-    ///         return value;
-    ///     }
-    /// }
-    /// </code>
-    /// <para>Usage:</para>
-    /// <code>
-    /// services.AddOptions&lt;MyConfig&gt;()
-    ///     .BindEnvars(settings =&gt;
-    ///     {
-    ///         settings.UseCustomEnvarPropertyBinder(new CustomBinder());
-    ///     });
-    /// </code>
-    /// </example>
+    /// <param name="binder">The converter to use.</param>
+    /// <returns>This instance.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="binder"/> is <see langword="null"/>.</exception>
+    /// <remarks>
+    /// <c>BindEnvars</c> captures and reuses this instance. It may call the binder concurrently.
+    /// The binder receives full environment values, so it must be deterministic, thread-safe, and must
+    /// not log or retain values. Binder failures are sanitized; <see cref="OperationCanceledException"/>
+    /// is propagated unchanged.
+    /// </remarks>
     public EnvarSettings UseCustomEnvarPropertyBinder(IEnvarPropertyBinder binder)
     {
+        ArgumentNullException.ThrowIfNull(binder);
+
         EnvarPropertyBinder = binder;
         return this;
     }
 
     /// <summary>
-    /// Configures the culture used for type conversion.
+    /// Uses a culture for value conversion.
     /// </summary>
-    /// <param name="culture">The culture to use for parsing numeric and date values.</param>
-    /// <returns>A new <see cref="EnvarSettings"/> instance with the specified culture.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="culture"/> is null.</exception>
+    /// <param name="culture">The parsing culture.</param>
+    /// <returns>This instance.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="culture"/> is <see langword="null"/>.</exception>
     /// <remarks>
-    /// By default, <see cref="CultureInfo.InvariantCulture"/> is used to ensure consistent
-    /// parsing regardless of the system locale. Use this method when environment variables
-    /// contain culture-specific formats. This culture is also applied to fallback
-    /// <see cref="System.ComponentModel.TypeConverter"/> conversions in the default binder.
+    /// The default is <see cref="CultureInfo.InvariantCulture"/>. <c>BindEnvars</c> captures a read-only
+    /// clone and also passes it to fallback <see cref="System.ComponentModel.TypeConverter"/> instances.
     /// </remarks>
-    /// <example>
-    /// <para>For European number formats (comma as decimal separator):</para>
-    /// <code>
-    /// using System.Globalization;
-    /// 
-    /// services.AddOptions&lt;MyConfig&gt;()
-    ///     .BindEnvars(settings =&gt;
-    ///     {
-    ///         settings.UseCulture(CultureInfo.GetCultureInfo("de-DE"));
-    ///     });
-    /// </code>
-    /// <para>Environment variable example:</para>
-    /// <code>
-    /// PRICE=123,45
-    /// // Will be parsed as 123.45 with German culture
-    /// </code>
-    /// </example>
     public EnvarSettings UseCulture(CultureInfo culture)
     {
+        ArgumentNullException.ThrowIfNull(culture);
+
         Culture = culture;
         return this;
     }
 
+    /// <summary>
+    /// Reads values from the given snapshot instead of the process environment.
+    /// </summary>
+    /// <param name="variables">Variable names and values; a <see langword="null"/> value means unset.</param>
+    /// <returns>This instance.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="variables"/> is <see langword="null"/>.</exception>
+    /// <remarks>
+    /// Intended for tests: consuming code can bind against fixed values without mutating the
+    /// process-global environment. The snapshot is copied, so later changes to
+    /// <paramref name="variables"/> have no effect.
+    /// </remarks>
+    public EnvarSettings UseEnvironmentSource(IReadOnlyDictionary<string, string?> variables)
+    {
+        ArgumentNullException.ThrowIfNull(variables);
+
+        EnvironmentSource = new Dictionary<string, string?>(variables);
+        return this;
+    }
 
     /// <summary>
-    /// Gets the property binder used for type conversion.
+    /// Prepends a prefix to every mapped variable name for this registration.
     /// </summary>
+    /// <param name="prefix">The prefix, for example <c>"APP_"</c>.</param>
+    /// <returns>This instance.</returns>
+    /// <exception cref="ArgumentException"><paramref name="prefix"/> is not a valid name fragment.</exception>
+    /// <remarks>
+    /// With <c>UseNamePrefix("APP_")</c>, a property mapped to <c>[Envar("PORT")]</c> reads
+    /// <c>APP_PORT</c>. Each combined name is validated by the usual rules.
+    /// </remarks>
+    public EnvarSettings UseNamePrefix(string prefix)
+    {
+        if (!EnvarAttribute.IsValidName(prefix))
+        {
+            throw new ArgumentException(
+                "The prefix must be non-empty and contain no '=' or control characters.", nameof(prefix));
+        }
+
+        NamePrefix = prefix;
+        return this;
+    }
+
     internal IEnvarPropertyBinder EnvarPropertyBinder { get; private set; }
 
-    /// <summary>
-    /// Gets the culture used for type conversion.
-    /// </summary>
     internal CultureInfo Culture { get; private set; }
 
-    /// <summary>
-    /// Gets a value indicating whether <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> is allowed.
-    /// </summary>
-    internal bool IsOptionsSnapshotAllowed { get; private set; }
+    internal Dictionary<string, string?>? EnvironmentSource { get; private set; }
 
-    /// <summary>
-    /// Gets a value indicating whether <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> is allowed.
-    /// </summary>
-    internal bool IsOptionsMonitorAllowed { get; private set; }
-
-    /// <summary>
-    /// Blocks <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> resolution.
-    /// </summary>
-    /// <returns>A new <see cref="EnvarSettings"/> instance with options snapshot disabled.</returns>
-    /// <remarks>
-    /// <para>
-    /// When disabled, <see cref="Microsoft.Extensions.Options.IOptionsSnapshot{TOptions}"/> resolution
-    /// will throw a <see cref="NotSupportedException"/>.
-    /// </para>
-    /// <para>
-    /// This is useful when you want to ensure that only <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/>
-    /// is used and prevent accidental injection of snapshot-based options.
-    /// </para>
-    /// </remarks>
-    /// <example>
-    /// <para>Configuration:</para>
-    /// <code>
-    /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindEnvars(settings =&gt;
-    ///     {
-    ///         settings.BlockOptionsSnapshot();
-    ///     });
-    /// </code>
-    /// <para>This will throw when trying to inject IOptionsSnapshot&lt;DatabaseSettings&gt;:</para>
-    /// <code>
-    /// public class MyService
-    /// {
-    ///     // This will throw NotSupportedException
-    ///     public MyService(IOptionsSnapshot&lt;DatabaseSettings&gt; config) { }
-    /// }
-    /// </code>
-    /// </example>
-    public EnvarSettings BlockOptionsSnapshot()
-    {
-        IsOptionsSnapshotAllowed = false;
-        return this;
-    }
-
-    /// <summary>
-    /// Blocks <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> resolution.
-    /// </summary>
-    /// <returns>A new <see cref="EnvarSettings"/> instance with options monitor disabled.</returns>
-    /// <remarks>
-    /// <para>
-    /// When disabled, <see cref="Microsoft.Extensions.Options.IOptionsMonitor{TOptions}"/> resolution
-    /// will throw a <see cref="NotSupportedException"/>.
-    /// </para>
-    /// <para>
-    /// This is useful when you want to ensure that only <see cref="Microsoft.Extensions.Options.IOptions{TOptions}"/>
-    /// is used and prevent accidental injection of monitor-based options.
-    /// </para>
-    /// </remarks>
-    /// <example>
-    /// <para>Configuration:</para>
-    /// <code>
-    /// services.AddOptions&lt;DatabaseSettings&gt;()
-    ///     .BindEnvars(settings =&gt;
-    ///     {
-    ///         settings.BlockOptionsMonitor();
-    ///     });
-    /// </code>
-    /// <para>This will throw when trying to inject IOptionsMonitor&lt;DatabaseSettings&gt;:</para>
-    /// <code>
-    /// public class MyService
-    /// {
-    ///     // This will throw NotSupportedException
-    ///     public MyService(IOptionsMonitor&lt;DatabaseSettings&gt; monitor) { }
-    /// }
-    /// </code>
-    /// </example>
-    public EnvarSettings BlockOptionsMonitor()
-    {
-        IsOptionsMonitorAllowed = false;
-        return this;
-    }
+    internal string? NamePrefix { get; private set; }
 }

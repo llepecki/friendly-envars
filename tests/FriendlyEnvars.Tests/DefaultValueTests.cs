@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Collections.Generic;
 using Xunit;
 
 namespace FriendlyEnvars.Tests;
@@ -37,22 +38,37 @@ public class DefaultValueTests : EnvarTestsBase
     }
 
     [Fact]
-    public void BindFromEnvironmentVariables_WithEmptyValues_ShouldSkipBinding()
+    public void BindFromEnvironmentVariables_WithEmptyStringValue_ShouldBindEmptyString()
     {
-        SetEnvironmentVariable("DEFAULT_STRING", "");
-        SetEnvironmentVariable("DEFAULT_INT", "");
-        SetEnvironmentVariable("DEFAULT_BOOL", "");
-
         var services = new ServiceCollection();
-        services.AddOptions<DefaultValueOptions>()
-            .BindEnvars();
+        BindCapturedEnvironment<DefaultValueOptions>(services, new Dictionary<string, string?>
+        {
+            ["DEFAULT_STRING"] = ""
+        });
 
         var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetRequiredService<IOptions<DefaultValueOptions>>().Value;
 
-        Assert.Equal("DefaultString", options.StringWithDefaultValue);
+        Assert.Equal("", options.StringWithDefaultValue);
         Assert.Equal(42, options.IntWithDefaultValue);
         Assert.True(options.BoolWithDefaultValue);
+    }
+
+    [Fact]
+    public void BindFromEnvironmentVariables_WithEmptyNonStringValue_ShouldThrow()
+    {
+        var services = new ServiceCollection();
+
+        // Conversion runs at registration, so the empty value fails here.
+        var exception = Assert.Throws<EnvarsException>(() => BindCapturedEnvironment<DefaultValueOptions>(
+            services, new Dictionary<string, string?>
+            {
+                ["DEFAULT_INT"] = ""
+            }));
+
+        Assert.Equal(EnvarFailureKind.Conversion, exception.FailureKind);
+        Assert.Contains("DEFAULT_INT", exception.Message);
+        Assert.Contains("System.Int32", exception.Message);
     }
 
     [Fact]

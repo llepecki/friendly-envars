@@ -1,18 +1,28 @@
 <Solution>
     <Folder Name="/resources/">
-        <File Path="resources\icon.png" />
+        <File Path="resources/icon-v2.png" />
     </Folder>
     <Folder Name="/root/">
         <File Path=".editorconfig" />
+        <File Path=".github/dependabot.yml" />
         <File Path=".github/workflows/ci.yml" />
         <File Path=".gitignore" />
+        <File Path="Directory.Build.props" />
+        <File Path="NuGet.config" />
         <File Path="README.md" />
         <File Path="LICENSE" />
+    </Folder>
+    <Folder Name="/eng/">
+        <Project Path="eng/FriendlyEnvars.RepositoryVerifier/FriendlyEnvars.RepositoryVerifier.csproj" />
+    </Folder>
+    <Folder Name="/sample/">
+        <Project Path="sample/FriendlyEnvars.Sample/FriendlyEnvars.Sample.csproj" />
     </Folder>
     <Folder Name="/src/">
         <Project Path="src/FriendlyEnvars/FriendlyEnvars.csproj" />
     </Folder>
     <Folder Name="/tests/">
-        <Project Path="tests\FriendlyEnvars.Tests\FriendlyEnvars.Tests.csproj" Type="Classic C#" />
+        <Project Path="tests/FriendlyEnvars.Tests/FriendlyEnvars.Tests.csproj" />
+        <Project Path="tests/FriendlyEnvars.TrimSmoke/FriendlyEnvars.TrimSmoke.csproj" />
     </Folder>
 </Solution>

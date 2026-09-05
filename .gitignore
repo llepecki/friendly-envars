@@ -66,8 +66,8 @@ nunit-*.xml
 .DS_Store
 
 # Environment variables
-.env
-.env.local
+.env*
+!.env.example
 
 # npm packages
 node_modules/
