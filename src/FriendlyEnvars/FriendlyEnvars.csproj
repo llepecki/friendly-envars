@@ -15,8 +15,8 @@
     <PropertyGroup>
         <!-- Required for deterministic, source-linked packages from local and CI builds. -->
         <Deterministic>true</Deterministic>
-        <!-- Keep one lock file valid for solution restore and the linux-x64 trim test. -->
-        <RuntimeIdentifiers>linux-x64</RuntimeIdentifiers>
+        <!-- Keep the lock file valid on the supported host runtimes: linux-x64, osx-arm64, win-x64. -->
+        <RuntimeIdentifiers>linux-x64;osx-arm64;win-x64</RuntimeIdentifiers>
         <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>

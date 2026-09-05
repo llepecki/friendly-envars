@@ -442,12 +442,9 @@ public class OptionsLifecycleTests : EnvarTestsBase
         var reader = new RecordingReader(new Dictionary<string, string?> { ["H03_NUMBER"] = string.Empty });
 
         var services = new ServiceCollection();
-        Bind<NumericOptions>(services, reader);
 
-        using var provider = services.BuildServiceProvider();
-        var factory = provider.GetRequiredService<IOptionsFactory<NumericOptions>>();
-
-        var exception = Assert.Throws<EnvarsException>(() => factory.Create(Options.DefaultName));
+        // Conversion runs at registration, so the empty value fails here.
+        var exception = Assert.Throws<EnvarsException>(() => Bind<NumericOptions>(services, reader));
 
         Assert.Equal(EnvarFailureKind.Conversion, exception.FailureKind);
         Assert.Equal("H03_NUMBER", exception.EnvironmentVariableName);
@@ -461,6 +458,10 @@ public class OptionsLifecycleTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         Bind<ConvertedOptions>(services, reader, configure: settings => settings.UseCustomEnvarPropertyBinder(binder));
+
+        // The registration-time dry run converts each captured value once; per-creation conversions
+        // are counted from here.
+        int convertCountAfterRegistration = binder.ConvertCount;
 
         using var provider = services.BuildServiceProvider();
         var factory = provider.GetRequiredService<IOptionsFactory<ConvertedOptions>>();
@@ -477,7 +478,7 @@ public class OptionsLifecycleTests : EnvarTestsBase
         Assert.Equal("payload", second.Payload!.Value);
 
         // The binder ran exactly once per present plan entry per options instance.
-        Assert.Equal(2, binder.ConvertCount);
+        Assert.Equal(2, binder.ConvertCount - convertCountAfterRegistration);
     }
 
     [Fact]
@@ -492,12 +493,10 @@ public class OptionsLifecycleTests : EnvarTestsBase
         var binder = new FailOnSecondBinder();
 
         var services = new ServiceCollection();
-        Bind<TwoValueOptions>(services, reader, configure: settings => settings.UseCustomEnvarPropertyBinder(binder));
 
-        using var provider = services.BuildServiceProvider();
-        var factory = provider.GetRequiredService<IOptionsFactory<TwoValueOptions>>();
-
-        var exception = Assert.Throws<EnvarsException>(() => factory.Create(Options.DefaultName));
+        // The registration-time dry run hits the failing value, so registration itself fails.
+        var exception = Assert.Throws<EnvarsException>(() =>
+            Bind<TwoValueOptions>(services, reader, configure: settings => settings.UseCustomEnvarPropertyBinder(binder)));
 
         Assert.Equal(EnvarFailureKind.Conversion, exception.FailureKind);
         Assert.Equal("H03_SECOND", exception.EnvironmentVariableName);

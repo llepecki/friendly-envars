@@ -58,13 +58,13 @@ public class DefaultValueTests : EnvarTestsBase
     public void BindFromEnvironmentVariables_WithEmptyNonStringValue_ShouldThrow()
     {
         var services = new ServiceCollection();
-        BindCapturedEnvironment<DefaultValueOptions>(services, new Dictionary<string, string?>
-        {
-            ["DEFAULT_INT"] = ""
-        });
 
-        var serviceProvider = services.BuildServiceProvider();
-        var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<DefaultValueOptions>>().Value);
+        // Conversion runs at registration, so the empty value fails here.
+        var exception = Assert.Throws<EnvarsException>(() => BindCapturedEnvironment<DefaultValueOptions>(
+            services, new Dictionary<string, string?>
+            {
+                ["DEFAULT_INT"] = ""
+            }));
 
         Assert.Equal(EnvarFailureKind.Conversion, exception.FailureKind);
         Assert.Contains("DEFAULT_INT", exception.Message);

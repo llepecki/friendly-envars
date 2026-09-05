@@ -174,13 +174,45 @@ OptionsValidationException
 - A second `BindEnvars()` call for the same options type and name throws `InvalidOperationException`.
 - Registrations run in order. The last source that sets a property wins.
 
+### Developing this repository
+
+Locked restore supports three host runtimes: linux-x64, osx-arm64 and win-x64. On another host
+(for example an Intel Mac or linux-arm64), `dotnet restore --locked-mode` fails with NU1004; add
+your host's runtime identifier to the two `RuntimeIdentifiers` lists and regenerate the lock files.
+
+### Testing without the process environment
+
+`UseEnvironmentSource` binds from a fixed snapshot, so tests never mutate process-global state:
+
+```csharp
+services
+    .AddOptions<DatabaseSettings>()
+    .BindEnvars(settings => settings.UseEnvironmentSource(new Dictionary<string, string?>
+    {
+        ["DB_HOST"] = "test-host",
+        ["DB_PORT"] = "5432"
+    }));
+```
+
+### Name prefixes
+
+`UseNamePrefix` prepends a prefix to every mapped name in one registration:
+
+```csharp
+services
+    .AddOptions<DatabaseSettings>()
+    .BindEnvars(settings => settings.UseNamePrefix("APP_"));
+// [Envar("DB_HOST")] now reads APP_DB_HOST.
+```
+
 ### Supported types
 
 The default binder supports:
 
-- `string`, `char`, and `bool`
+- `string`, `char`, and `bool` (`true`/`false` only; `1`/`0` are rejected)
 - All integer and floating-point types, plus `decimal`
-- `Guid`, `Uri`, `TimeSpan`, `DateTime`, `DateTimeOffset`, `DateOnly`, and `TimeOnly`
+- `Guid`, `Uri` (absolute only), `TimeSpan`, `DateTime` (declared kind preserved, so `Z` stays UTC),
+  `DateTimeOffset`, `DateOnly`, and `TimeOnly`
 - Enums, including `[Flags]` enums
 - Nullable forms of these types
 - Types with a `TypeConverter`

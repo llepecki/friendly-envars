@@ -104,6 +104,62 @@ public class HostileMetadataTests
         Assert.Equal(typeof(InvalidOperationException).FullName, exception.CauseType);
     }
 
+    [Fact]
+    public void AHostileBaseTypeStaysBehindTheSanitizedContract()
+    {
+        // The garbage blob sits on a base-type static, which only the unreachable-attribute walk
+        // inspects - the derived discovery surface never sees it.
+        var baseType = EmitBaseWithGarbageStaticEnvarBlob(out var derivedType);
+        _ = baseType;
+
+        var exception = Assert.Throws<EnvarsException>(() => BindingPlan.Build(
+            derivedType, string.Empty, ProcessEnvironmentVariableReader.Instance, NullBindingPlanObserver.Instance));
+
+        Assert.Equal(EnvarFailureKind.InvalidProperty, exception.FailureKind);
+        Assert.Null(exception.InnerException);
+    }
+
+    private static Type EmitBaseWithGarbageStaticEnvarBlob(out Type derivedType)
+    {
+        var assembly = AssemblyBuilder.DefineDynamicAssembly(
+            new AssemblyName("HostileBaseMetadata"), AssemblyBuilderAccess.RunAndCollect);
+        var module = assembly.DefineDynamicModule("HostileBaseMetadata");
+
+        var baseBuilder = module.DefineType("HostileBase", TypeAttributes.Public | TypeAttributes.Class);
+        var field = baseBuilder.DefineField("_value", typeof(string), FieldAttributes.Private | FieldAttributes.Static);
+        var property = baseBuilder.DefineProperty("Value", PropertyAttributes.None, typeof(string), null);
+
+        var getter = baseBuilder.DefineMethod(
+            "get_Value",
+            MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
+            typeof(string), Type.EmptyTypes);
+        var getterBody = getter.GetILGenerator();
+        getterBody.Emit(OpCodes.Ldsfld, field);
+        getterBody.Emit(OpCodes.Ret);
+        property.SetGetMethod(getter);
+
+        var setter = baseBuilder.DefineMethod(
+            "set_Value",
+            MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
+            null, [typeof(string)]);
+        var setterBody = setter.GetILGenerator();
+        setterBody.Emit(OpCodes.Ldarg_0);
+        setterBody.Emit(OpCodes.Stsfld, field);
+        setterBody.Emit(OpCodes.Ret);
+        property.SetSetMethod(setter);
+
+        var envarConstructor = typeof(EnvarAttribute).GetConstructor([typeof(string)])!;
+        property.SetCustomAttribute(envarConstructor, [0x01, 0x00, 0xFF]);
+
+        var emittedBase = baseBuilder.CreateType();
+
+        var derivedBuilder = module.DefineType(
+            "HostileDerived", TypeAttributes.Public | TypeAttributes.Class, emittedBase);
+        derivedType = derivedBuilder.CreateType();
+
+        return emittedBase;
+    }
+
     public sealed class PlainOptions
     {
         [Envar("HOSTILE_METADATA_VALUE")]

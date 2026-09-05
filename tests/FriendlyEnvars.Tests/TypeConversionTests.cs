@@ -90,11 +90,9 @@ public class TypeConversionTests : EnvarTestsBase
         SetEnvironmentVariable("TYPES_BOOL", "not-a-bool");
 
         var services = new ServiceCollection();
-        services.AddOptions<TypeOptions>()
-            .BindEnvars();
 
-        var serviceProvider = services.BuildServiceProvider();
-        var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<TypeOptions>>().Value);
+        // Conversion runs at registration, so the failure surfaces here.
+        var exception = Assert.Throws<EnvarsException>(() => services.AddOptions<TypeOptions>().BindEnvars());
 
         Assert.Equal(EnvarFailureKind.Conversion, exception.FailureKind);
         Assert.Contains("TYPES_BOOL", exception.Message);
@@ -110,11 +108,9 @@ public class TypeConversionTests : EnvarTestsBase
         SetEnvironmentVariable("TYPES_ENUM", "Four");
 
         var services = new ServiceCollection();
-        services.AddOptions<TypeOptions>()
-            .BindEnvars();
 
-        var serviceProvider = services.BuildServiceProvider();
-        var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<TypeOptions>>().Value);
+        // Conversion runs at registration, so the failure surfaces here.
+        var exception = Assert.Throws<EnvarsException>(() => services.AddOptions<TypeOptions>().BindEnvars());
 
         Assert.Equal(EnvarFailureKind.Conversion, exception.FailureKind);
         Assert.Contains("TYPES_ENUM", exception.Message);
@@ -130,11 +126,9 @@ public class TypeConversionTests : EnvarTestsBase
         SetEnvironmentVariable("TYPES_CHAR", "TooLong");
 
         var services = new ServiceCollection();
-        services.AddOptions<TypeOptions>()
-            .BindEnvars();
 
-        var serviceProvider = services.BuildServiceProvider();
-        var exception = Assert.Throws<EnvarsException>(() => serviceProvider.GetRequiredService<IOptions<TypeOptions>>().Value);
+        // Conversion runs at registration, so the failure surfaces here.
+        var exception = Assert.Throws<EnvarsException>(() => services.AddOptions<TypeOptions>().BindEnvars());
 
         Assert.Equal(EnvarFailureKind.Conversion, exception.FailureKind);
         Assert.Contains("TYPES_CHAR", exception.Message);

@@ -57,16 +57,13 @@ public class CancellationTests : EnvarTestsBase
         var cancellation = new OperationCanceledException("cancelled inside the binder");
 
         var services = new ServiceCollection();
-        OptionsBuilderExtensions.BindEnvarsCore(
+
+        // The registration-time dry run reaches the binder, so cancellation propagates here.
+        var thrown = Assert.Throws<OperationCanceledException>(() => OptionsBuilderExtensions.BindEnvarsCore(
             services.AddOptions<TextOptions>(),
             settings => settings.UseCustomEnvarPropertyBinder(new CancellingBinder(cancellation)),
             new StubReader("bound"),
-            NullBindingPlanObserver.Instance);
-
-        using var provider = services.BuildServiceProvider();
-        var factory = provider.GetRequiredService<IOptionsFactory<TextOptions>>();
-
-        var thrown = Assert.Throws<OperationCanceledException>(() => factory.Create(Options.DefaultName));
+            NullBindingPlanObserver.Instance));
 
         Assert.Same(cancellation, thrown);
     }
@@ -128,16 +125,12 @@ public class CancellationTests : EnvarTestsBase
         var cancellation = new TaskCanceledExceptionSubstitute(source.Token);
 
         var services = new ServiceCollection();
-        OptionsBuilderExtensions.BindEnvarsCore(
+
+        var thrown = Assert.Throws<TaskCanceledExceptionSubstitute>(() => OptionsBuilderExtensions.BindEnvarsCore(
             services.AddOptions<TextOptions>(),
             settings => settings.UseCustomEnvarPropertyBinder(new CancellingBinder(cancellation)),
             new StubReader("bound"),
-            NullBindingPlanObserver.Instance);
-
-        using var provider = services.BuildServiceProvider();
-
-        var thrown = Assert.Throws<TaskCanceledExceptionSubstitute>(
-            () => provider.GetRequiredService<IOptionsFactory<TextOptions>>().Create(Options.DefaultName));
+            NullBindingPlanObserver.Instance));
 
         Assert.Same(cancellation, thrown);
         Assert.Equal(source.Token, thrown.CancellationToken);
@@ -167,16 +160,12 @@ public class CancellationTests : EnvarTestsBase
     {
         // Non-cancellation failures remain sanitized.
         var services = new ServiceCollection();
-        OptionsBuilderExtensions.BindEnvarsCore(
+
+        var exception = Assert.Throws<EnvarsException>(() => OptionsBuilderExtensions.BindEnvarsCore(
             services.AddOptions<TextOptions>(),
             static settings => settings.UseCustomEnvarPropertyBinder(new ThrowingBinder()),
             new StubReader("bound"),
-            NullBindingPlanObserver.Instance);
-
-        using var provider = services.BuildServiceProvider();
-
-        var exception = Assert.Throws<EnvarsException>(
-            () => provider.GetRequiredService<IOptionsFactory<TextOptions>>().Create(Options.DefaultName));
+            NullBindingPlanObserver.Instance));
 
         Assert.Equal(EnvarFailureKind.Conversion, exception.FailureKind);
         Assert.Null(exception.InnerException);
@@ -201,7 +190,7 @@ public class CancellationTests : EnvarTestsBase
         Assert.NotEqual(conversion.FailureKind, assignment.FailureKind);
 
         // Conversion carries the culture and binder that were in play; assignment cannot.
-        Assert.Equal(CultureInfo.InvariantCulture.Name, conversion.CultureName);
+        Assert.Equal("invariant", conversion.CultureName);
         Assert.Equal(typeof(ThrowingBinder), conversion.BinderType);
         Assert.Null(assignment.CultureName);
         Assert.Null(assignment.BinderType);
@@ -236,8 +225,17 @@ public class CancellationTests : EnvarTestsBase
     private static EnvarsException CaptureFailure<T>(Action<EnvarSettings>? configure) where T : class, new()
     {
         var services = new ServiceCollection();
-        OptionsBuilderExtensions.BindEnvarsCore(
-            services.AddOptions<T>(), configure, new StubReader("bound"), NullBindingPlanObserver.Instance);
+
+        // Conversion failures surface at registration; assignment failures at the first creation.
+        try
+        {
+            OptionsBuilderExtensions.BindEnvarsCore(
+                services.AddOptions<T>(), configure, new StubReader("bound"), NullBindingPlanObserver.Instance);
+        }
+        catch (EnvarsException registrationFailure)
+        {
+            return registrationFailure;
+        }
 
         using var provider = services.BuildServiceProvider();
 
@@ -254,16 +252,12 @@ public class CancellationTests : EnvarTestsBase
         var cancellation = new OperationCanceledException("cancelled");
 
         var services = new ServiceCollection();
-        OptionsBuilderExtensions.BindEnvarsCore(
+
+        var thrown = Assert.Throws<OperationCanceledException>(() => OptionsBuilderExtensions.BindEnvarsCore(
             services.AddOptions<TextOptions>(),
             settings => settings.UseCustomEnvarPropertyBinder(new CancellingBinder(cancellation)),
             new StubReader(Secret),
-            NullBindingPlanObserver.Instance);
-
-        using var provider = services.BuildServiceProvider();
-
-        var thrown = Assert.Throws<OperationCanceledException>(
-            () => provider.GetRequiredService<IOptionsFactory<TextOptions>>().Create(Options.DefaultName));
+            NullBindingPlanObserver.Instance));
 
         Assert.Same(cancellation, thrown);
         Assert.DoesNotContain(Secret, thrown.ToString(), StringComparison.Ordinal);

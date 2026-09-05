@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace FriendlyEnvars;
@@ -33,8 +34,19 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
     /// <exception cref="OverflowException">The value exceeds the target type's range.</exception>
     /// <exception cref="NotSupportedException">No converter is available.</exception>
     /// <remarks>
-    /// A fallback <see cref="TypeConverter"/> receives the full value. It must be deterministic,
-    /// thread-safe, and must not log or retain the value.
+    /// <para>
+    /// Enum text follows a strict grammar rather than <see cref="Enum.Parse(Type, string)"/>: an
+    /// exact-case member name wins, a case-insensitive match is accepted only when unambiguous,
+    /// numeric text must be unsigned decimal and match a declared member (or, for flags, stay within
+    /// declared bits), comma lists are accepted for flags enums only and may contain member names
+    /// only. In the binding pipeline the reason text is discarded by exception sanitization; call
+    /// this method directly to observe it.
+    /// </para>
+    /// <para>
+    /// <see cref="bool"/> accepts <c>true</c>/<c>false</c> only, and <see cref="Uri"/> requires an
+    /// absolute URI. A fallback <see cref="TypeConverter"/> receives the full value. It must be
+    /// deterministic, thread-safe, and must not log or retain the value.
+    /// </para>
     /// </remarks>
     [StackTraceHidden]
     public object? Convert(string value, Type targetType, CultureInfo culture)
@@ -71,32 +83,63 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
             _ when targetType == typeof(Guid) => Guid.Parse(value),
             _ when targetType == typeof(Uri) => new Uri(value),
             _ when targetType == typeof(TimeSpan) => TimeSpan.Parse(value, culture),
-            _ when targetType == typeof(DateTime) => DateTime.Parse(value, culture),
+            _ when targetType == typeof(DateTime) => DateTime.Parse(value, culture, DateTimeStyles.RoundtripKind),
             _ when targetType == typeof(DateTimeOffset) => DateTimeOffset.Parse(value, culture),
             _ when targetType == typeof(DateOnly) => DateOnly.Parse(value, culture),
             _ when targetType == typeof(TimeOnly) => TimeOnly.Parse(value, culture),
-            _ => ConvertUsingTypeConverter(value, targetType, culture)
+            _ => ConvertUsingTypeConverter(value, conversion, culture)
         };
     }
 
     [StackTraceHidden]
-    private static object? ConvertUsingTypeConverter(string value, Type targetType, CultureInfo culture)
+    private static object? ConvertUsingTypeConverter(string value, PrecomputedConversion conversion, CultureInfo culture)
     {
-        var converter = TypeDescriptor.GetConverter(targetType);
+        var converter = conversion.FallbackConverter ?? GetConverter(conversion.ConversionType);
         return converter.ConvertFrom(null, culture, value);
+    }
+
+    /// <summary>
+    /// Resolves the fallback converter. The trim analyzer flags the call because converters are
+    /// discovered reflectively; the trimmer preserves a converter referenced by the target type's
+    /// <see cref="TypeConverterAttribute"/>, and the trim smoke test binds through this path against a
+    /// trimmed publish.
+    /// </summary>
+    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Converters reached through TypeConverterAttribute survive trimming; covered by the trim smoke test.")]
+    [UnconditionalSuppressMessage("Trimming", "IL2067", Justification = "Converters reached through TypeConverterAttribute survive trimming; covered by the trim smoke test.")]
+    private static TypeConverter GetConverter(Type conversionType)
+    {
+        return TypeDescriptor.GetConverter(conversionType);
     }
 
     internal sealed class PrecomputedConversion
     {
-        private PrecomputedConversion(Type conversionType, EnumText.Metadata? enumMetadata)
+        private PrecomputedConversion(Type conversionType, EnumText.Metadata? enumMetadata, TypeConverter? fallbackConverter)
         {
             ConversionType = conversionType;
             EnumMetadata = enumMetadata;
+            FallbackConverter = fallbackConverter;
         }
 
         internal Type ConversionType { get; }
 
         internal EnumText.Metadata? EnumMetadata { get; }
+
+        /// <summary>Resolved once per plan entry; the plan's lifetime bounds it, so nothing outlives the registration.</summary>
+        internal TypeConverter? FallbackConverter { get; }
+
+        /// <summary>
+        /// Deliberately a comparison chain, not a static collection: the library keeps no static
+        /// collection of Type handles, which the unload-safety test enforces structurally.
+        /// </summary>
+        private static bool IsBuiltIn(Type type)
+        {
+            return type == typeof(string) || type == typeof(char) || type == typeof(bool)
+                || type == typeof(byte) || type == typeof(sbyte) || type == typeof(short) || type == typeof(ushort)
+                || type == typeof(int) || type == typeof(uint) || type == typeof(long) || type == typeof(ulong)
+                || type == typeof(float) || type == typeof(double) || type == typeof(decimal)
+                || type == typeof(Guid) || type == typeof(Uri) || type == typeof(TimeSpan)
+                || type == typeof(DateTime) || type == typeof(DateTimeOffset) || type == typeof(DateOnly) || type == typeof(TimeOnly);
+        }
 
         internal static PrecomputedConversion Create(Type declaredType)
         {
@@ -114,7 +157,8 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
 
             if (!conversionType.IsEnum)
             {
-                return new PrecomputedConversion(conversionType, null);
+                var fallbackConverter = IsBuiltIn(conversionType) ? null : GetConverter(conversionType);
+                return new PrecomputedConversion(conversionType, null, fallbackConverter);
             }
 
             EnumText.Metadata? metadata = null;
@@ -125,7 +169,7 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
                 enumMetadataCache?[conversionType] = metadata;
             }
 
-            return new PrecomputedConversion(conversionType, metadata);
+            return new PrecomputedConversion(conversionType, metadata, null);
         }
     }
 
@@ -244,7 +288,7 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
                         throw Invalid(enumType, "a list element is empty");
                     }
 
-                    if (!TryMatchName(trimmedToken, names, patterns, out ulong tokenPattern))
+                    if (!TryMatchName(trimmedToken, names, patterns, out ulong tokenPattern, out _))
                     {
                         throw Invalid(enumType, "a list element is not an unambiguous declared member name");
                     }
@@ -252,9 +296,13 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
                     result |= tokenPattern;
                 }
             }
-            else if (TryMatchName(trimmed, names, patterns, out ulong singlePattern))
+            else if (TryMatchName(trimmed, names, patterns, out ulong singlePattern, out bool singleAmbiguous))
             {
                 result = singlePattern;
+            }
+            else if (singleAmbiguous)
+            {
+                throw Invalid(enumType, "the name matches declared members that differ only by case");
             }
             else
             {
@@ -280,9 +328,14 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
                 throw Invalid(enumType, "the type is not a flags enum, so a list is not accepted");
             }
 
-            if (TryMatchName(trimmed, names, patterns, out ulong namePattern))
+            if (TryMatchName(trimmed, names, patterns, out ulong namePattern, out bool ambiguous))
             {
                 return ToEnum(namePattern, enumType, typeCode);
+            }
+
+            if (ambiguous)
+            {
+                throw Invalid(enumType, "the name matches declared members that differ only by case");
             }
 
             ulong numeric = ParseUnsignedDecimal(trimmed, enumType, typeCode);
@@ -340,8 +393,10 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
             return true;
         }
 
-        private static bool TryMatchName(string token, string[] names, ulong[] patterns, out ulong pattern)
+        private static bool TryMatchName(string token, string[] names, ulong[] patterns, out ulong pattern, out bool ambiguous)
         {
+            ambiguous = false;
+
             for (int i = 0; i < names.Length; i++)
             {
                 if (string.Equals(names[i], token, StringComparison.Ordinal))
@@ -366,6 +421,7 @@ public sealed class DefaultEnvarPropertyBinder : IEnvarPropertyBinder
                     else if (patterns[i] != candidate)
                     {
                         // Never choose arbitrarily between case-insensitive aliases.
+                        ambiguous = true;
                         pattern = 0;
                         return false;
                     }

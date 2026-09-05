@@ -131,6 +131,35 @@ public sealed class EnvarsException : Exception
             causeType: null);
     }
 
+    /// <summary>The invariant culture's name is the empty string, which reads as absent in a log.</summary>
+    internal static string DescribeCulture(System.Globalization.CultureInfo culture)
+    {
+        return culture.Name.Length == 0 ? "invariant" : culture.Name;
+    }
+
+    internal static EnvarsException UnreachableProperty(
+        Type optionsType,
+        string optionsName,
+        string propertyName,
+        Type? targetType)
+    {
+        string message =
+            $"Options type '{optionsType.FullName}' inherits '{propertyName}', which carries [Envar] " +
+            "but can never be bound: it is hidden by a redeclaration or declared static on a base type.";
+
+        return new EnvarsException(
+            message,
+            EnvarFailureKind.InvalidProperty,
+            environmentVariableName: null,
+            optionsType,
+            optionsName,
+            propertyName,
+            targetType,
+            cultureName: null,
+            binderType: null,
+            causeType: null);
+    }
+
     internal static EnvarsException InvalidAttributeName(
         Type optionsType,
         string optionsName,

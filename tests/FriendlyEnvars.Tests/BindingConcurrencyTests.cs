@@ -70,6 +70,7 @@ public class BindingConcurrencyTests : EnvarTestsBase
         private readonly Barrier _barrier;
         private int _conversions;
         private int _timeouts;
+        private volatile bool _armed;
 
         public RendezvousBinder(int participants)
         {
@@ -80,8 +81,16 @@ public class BindingConcurrencyTests : EnvarTestsBase
 
         public int TimeoutCount => Volatile.Read(ref _timeouts);
 
+        /// <summary>Called after registration, so the dry-run conversion neither counts nor joins the barrier.</summary>
+        public void Arm() => _armed = true;
+
         public object? Convert(string value, Type targetType, CultureInfo culture)
         {
+            if (!_armed)
+            {
+                return value;
+            }
+
             Interlocked.Increment(ref _conversions);
 
             if (!_barrier.SignalAndWait(BarrierTimeout))
@@ -196,6 +205,7 @@ public class BindingConcurrencyTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<SingleValueOptions>().BindEnvars(settings => settings.UseCustomEnvarPropertyBinder(binder));
+        binder.Arm();
 
         using var provider = services.BuildServiceProvider();
         var factory = provider.GetRequiredService<IOptionsFactory<SingleValueOptions>>();
@@ -216,6 +226,7 @@ public class BindingConcurrencyTests : EnvarTestsBase
 
         var services = new ServiceCollection();
         services.AddOptions<SingleValueOptions>().BindEnvars(settings => settings.UseCustomEnvarPropertyBinder(binder));
+        binder.Arm();
 
         using var provider = services.BuildServiceProvider();
 
@@ -240,13 +251,16 @@ public class BindingConcurrencyTests : EnvarTestsBase
         var services = new ServiceCollection();
         services.AddOptions<SingleValueOptions>().BindEnvars(settings => settings.UseCustomEnvarPropertyBinder(binder));
 
+        // The registration-time dry run converts once; per-creation conversions count from here.
+        int conversionsAfterRegistration = binder.ConversionCount;
+
         using var provider = services.BuildServiceProvider();
         var factory = provider.GetRequiredService<IOptionsFactory<SingleValueOptions>>();
 
         RunConcurrently(Participants, _ => factory.Create(Options.DefaultName));
 
         // Each instance converts once through the shared binder.
-        Assert.Equal(Participants, binder.ConversionCount);
+        Assert.Equal(Participants, binder.ConversionCount - conversionsAfterRegistration);
     }
 
     [Fact]

@@ -94,7 +94,16 @@ public class ExceptionSafetyTests : EnvarTestsBase
         where T : class, new()
     {
         var services = new ServiceCollection();
-        services.AddOptions<T>(optionsName).BindEnvars(configure);
+
+        // Conversion failures surface at registration; assignment failures at the first creation.
+        try
+        {
+            services.AddOptions<T>(optionsName).BindEnvars(configure);
+        }
+        catch (EnvarsException registrationFailure)
+        {
+            return registrationFailure;
+        }
 
         using var serviceProvider = services.BuildServiceProvider();
         var factory = serviceProvider.GetRequiredService<IOptionsFactory<T>>();
@@ -156,7 +165,8 @@ public class ExceptionSafetyTests : EnvarTestsBase
         Assert.Equal(Options.DefaultName, exception.OptionsName);
         Assert.Equal(nameof(NumericOptions.Value), exception.PropertyName);
         Assert.Equal(typeof(int), exception.TargetType);
-        Assert.Equal(CultureInfo.InvariantCulture.Name, exception.CultureName);
+        // The invariant culture's empty name is reported as "invariant" so logs stay unambiguous.
+        Assert.Equal("invariant", exception.CultureName);
         Assert.Equal(typeof(DefaultEnvarPropertyBinder), exception.BinderType);
         Assert.Equal(typeof(FormatException).FullName, exception.CauseType);
 

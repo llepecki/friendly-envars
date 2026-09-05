@@ -8,15 +8,24 @@
         <!--
           Declared here rather than passed on the command line, so every restore - the plain solution
           one and eng/trim-smoke.sh's runtime-specific one - evaluates the same graph and the committed
-          packages.lock.json satisfies locked mode for both. A CLI-only runtime produces a lock file
-          the other restore flavour rejects with NU1004.
+          packages.lock.json satisfies locked mode for both. PublishTrimmed additionally makes restore
+          include the host's runtime, so the three supported host runtimes are declared: linux-x64,
+          osx-arm64 and win-x64. Other hosts fail locked restore with NU1004; see the README's
+          development note.
         -->
-        <RuntimeIdentifiers>linux-x64</RuntimeIdentifiers>
+        <RuntimeIdentifiers>linux-x64;osx-arm64;win-x64</RuntimeIdentifiers>
         <!--
           Published by eng/trim-smoke.sh with PublishTrimmed and TrimMode=link, so a trim warning from
           the library surfaces here as a build error. The project itself stays warning-free too.
         -->
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <!--
+          Declared here so the trimming toolchain participates in restore and lands in the lock file.
+          Passing PublishTrimmed only on the publish command line leaves the ILLink package out of the
+          locked graph, and publish then silently skips trimming while still exiting 0.
+        -->
+        <PublishTrimmed>true</PublishTrimmed>
+        <TrimMode>link</TrimMode>
     </PropertyGroup>
 
     <ItemGroup>

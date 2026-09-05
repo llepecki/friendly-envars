@@ -24,8 +24,12 @@ public static class OptionsBuilderExtensions
     /// <exception cref="EnvarsException">A mapping is invalid, a read fails, or a value cannot be converted or assigned.</exception>
     /// <exception cref="InvalidOperationException">The same options type and name are already bound.</exception>
     /// <remarks>
-    /// This method validates mappings and captures values immediately. An unset variable is skipped;
-    /// an empty string is passed to the binder. Later environment changes have no effect.
+    /// This method validates mappings, captures values, and converts each captured value immediately,
+    /// so an invalid mapping or an unconvertible value fails here rather than at the first options
+    /// resolution. Conversion also runs again for each created options instance, and assignment runs
+    /// per instance, so a throwing setter surfaces there.
+    /// An unset variable is skipped; an empty string is passed to the binder. Later environment
+    /// changes have no effect.
     /// <para>
     /// Normal Options registration order applies. Later configuration overrides earlier configuration
     /// for the same property and options name.
@@ -69,8 +73,13 @@ public static class OptionsBuilderExtensions
                 $"options name '{EnvarsException.FormatOptionsName(optionsName)}'.");
         }
 
-        // Build first so a failure cannot leave a partial registration.
-        var plan = BindingPlan.Build(typeof(T), optionsName, environmentVariableReader, planObserver);
+        var reader = settings.EnvironmentSource is { } source
+            ? new SnapshotEnvironmentVariableReader(source)
+            : environmentVariableReader;
+
+        // Build and dry-run first so a failure cannot leave a partial registration.
+        var plan = BindingPlan.Build(typeof(T), optionsName, reader, planObserver, settings.NamePrefix);
+        plan.DryRunConversions(binder, culture);
 
         optionsBuilder.Services.AddSingleton(new FriendlyEnvarsRegistrationMarker(typeof(T), optionsName));
 
